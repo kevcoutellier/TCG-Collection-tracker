@@ -33,7 +33,10 @@ export async function getCard(id: string, lang: Lang = "fr"): Promise<CardDetail
   "use cache";
   cacheLife("hours");
   cacheTag(`card:${id}`);
-  return api<CardDetail>(lang, `/cards/${encodeURIComponent(id)}`);
+  const card = await api<CardDetail>(lang, `/cards/${encodeURIComponent(id)}`);
+  // Les cartes japonaises renvoient la rareté littérale « None ».
+  if (card?.rarity === "None") delete card.rarity;
+  return card;
 }
 
 async function getPocketSetIds(): Promise<string[]> {

@@ -41,7 +41,7 @@ export async function GET() {
       r.name,
       r.setName,
       r.cardId,
-      r.variant,
+      r.variantLabel ?? r.variant,
       r.language,
       r.condition,
       r.gradingCompany ? `${r.gradingCompany} ${r.grade ?? ""}`.trim() : "",
