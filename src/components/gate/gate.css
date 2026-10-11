@@ -1,0 +1,1055 @@
+/*
+ * Gate d'entrée PokéFolio : intro Poké Ball.
+ * Timeline unique pilotée par les variables --t-* (posées par le composant) ; tant que la gate est en
+ * phase « pre » (avant hydratation), toutes les animations sont figées sur leur première image.
+ */
+
+@property --zoom {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+html[data-gate="on"],
+html[data-gate="reveal"] {
+  overflow: hidden;
+}
+
+html[data-gate="off"] .pg-root {
+  display: none;
+}
+
+html[data-gate="reveal"] [data-app-shell] {
+  transform-origin: 50% 40vh;
+  animation: pg-site-in 900ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.pg-root {
+  --red: #ee3b2b;
+  --ink: #15161d;
+  --gold: #ffd65e;
+  --px: 0;
+  --py: 0;
+  --zoom: 0;
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  isolation: isolate;
+  color: var(--foreground);
+  background:
+    radial-gradient(48rem 30rem at 50% 36%, rgb(255 214 94 / 7%), transparent 70%),
+    radial-gradient(60rem 40rem at 90% 110%, rgb(91 155 245 / 11%), transparent 70%),
+    radial-gradient(56rem 36rem at 8% -12%, rgb(238 59 43 / 9%), transparent 70%),
+    var(--background);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+  transition:
+    --zoom 950ms cubic-bezier(0.55, 0, 0.8, 0.2),
+    opacity 650ms ease;
+}
+
+/* Vignette */
+.pg-root::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 45%, transparent 45%, rgb(0 0 0 / 55%) 100%);
+}
+
+.pg-root[data-phase="pre"] *:not(.pg-spark),
+.pg-root[data-phase="pre"] *::before,
+.pg-root[data-phase="pre"] *::after {
+  animation-play-state: paused !important;
+}
+
+.pg-root[data-opened] {
+  --zoom: 900;
+}
+
+.pg-root[data-phase="reveal"] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pg-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+.pg-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* ───────────── Colonne centrale ───────────── */
+
+.pg-center {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px;
+  text-align: center;
+}
+
+/* ───────────── La Poké Ball ───────────── */
+
+.pg-ball {
+  --size: clamp(150px, 34vmin, 300px);
+  position: relative;
+  width: var(--size);
+  height: var(--size);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  transition: scale 450ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.pg-ball[aria-disabled="true"] {
+  cursor: default;
+}
+
+.pg-root[data-armed] .pg-ball:hover {
+  scale: 1.04;
+}
+
+.pg-root[data-armed] .pg-ball:active {
+  scale: 0.95;
+  transition-duration: 120ms;
+}
+
+.pg-root:focus {
+  outline: none;
+}
+
+.pg-ball:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 14px;
+}
+
+.pg-ball > span,
+.pg-ball span span {
+  display: block;
+}
+
+.pg-float,
+.pg-tilt,
+.pg-shake,
+.pg-body {
+  position: absolute;
+  inset: 0;
+}
+
+.pg-float {
+  animation: pg-float 3.4s ease-in-out var(--t-ready) infinite;
+}
+
+.pg-tilt {
+  transform: perspective(900px) rotateX(calc(var(--py) * -14deg)) rotateY(calc(var(--px) * 16deg));
+}
+
+.pg-shake {
+  transform-origin: 50% 88%;
+  animation: pg-shake 650ms ease-in-out var(--t-shake) 3 both;
+}
+
+.pg-body {
+  animation: pg-click 460ms cubic-bezier(0.3, 1.6, 0.5, 1) var(--t-click) both;
+}
+
+.pg-half {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  /* Les deux moitiés se chevauchent d'1 % pour qu'aucune couture n'apparaisse à l'équateur. */
+  height: 50.5%;
+}
+
+.pg-lid {
+  top: 0;
+  transform-origin: 50% 100%;
+}
+
+.pg-base {
+  bottom: 0;
+}
+
+.pg-half svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Remplissage : la matière se répand depuis l'équateur. */
+.pg-lid .pg-fill {
+  animation: pg-fill-lid 560ms cubic-bezier(0.65, 0, 0.35, 1) var(--t-fill) both;
+}
+
+.pg-base .pg-fill {
+  animation: pg-fill-base 560ms cubic-bezier(0.65, 0, 0.35, 1) var(--t-fill) both;
+}
+
+/* Tracé : lumière dorée qui dessine la Ball, puis devient l'encre du contour. */
+.pg-ink {
+  animation: pg-ink-glow 500ms ease calc(var(--t-fill) + 150ms) both;
+}
+
+.pg-ink > * {
+  fill: none;
+  stroke: var(--ink);
+  /* Tirets seulement pendant le tracé (fill « backwards ») : ensuite, contour plein sans raccord visible. */
+  animation:
+    pg-draw 720ms cubic-bezier(0.65, 0, 0.35, 1) calc(var(--t-draw) + var(--d, 0ms)) backwards,
+    pg-ink 420ms ease calc(var(--t-fill) + 150ms) both;
+}
+
+.pg-spec,
+.pg-sheen,
+.pg-light {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* Reflet spéculaire qui suit le pointeur. */
+.pg-spec {
+  background: radial-gradient(
+    circle at calc(33% + var(--px) * 9%) calc(27% + var(--py) * 9%),
+    rgb(255 255 255 / 75%),
+    rgb(255 255 255 / 0%) 20%
+  );
+  mix-blend-mode: screen;
+  animation: pg-fade-in 600ms ease calc(var(--t-fill) + 350ms) both;
+  transition: opacity 200ms;
+}
+
+/* Balayage de lumière : à la fin du remplissage, puis au clic de capture. */
+.pg-sheen {
+  overflow: hidden;
+}
+
+.pg-sheen::before {
+  content: "";
+  position: absolute;
+  inset: -25%;
+  background: linear-gradient(115deg, transparent 38%, rgb(255 255 255 / 70%) 50%, transparent 62%);
+  mix-blend-mode: overlay;
+  translate: -110% 0;
+  animation:
+    pg-sheen 900ms cubic-bezier(0.4, 0, 0.2, 1) calc(var(--t-fill) + 380ms) both,
+    pg-sheen 900ms cubic-bezier(0.4, 0, 0.2, 1) var(--t-click);
+}
+
+.pg-btn-blink,
+.pg-btn-idle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 17%;
+  height: 17%;
+  translate: -50% -50%;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Le bouton clignote en rouge pendant chaque secousse, comme dans les jeux. */
+.pg-btn-blink {
+  background: radial-gradient(circle, #fff 0%, #ff8f7a 40%, rgb(255 60 40 / 0%) 72%);
+  box-shadow: 0 0 calc(var(--size) * 0.12) rgb(255 70 50 / 85%);
+  animation: pg-blink 650ms ease-out var(--t-shake) 3 backwards;
+}
+
+.pg-btn-idle {
+  background: radial-gradient(circle, #fff 0%, rgb(255 246 214 / 90%) 45%, rgb(255 230 160 / 0%) 72%);
+  box-shadow: 0 0 calc(var(--size) * 0.1) rgb(255 220 130 / 60%);
+  transition: scale 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.pg-root[data-phase="ready"] .pg-btn-idle {
+  animation: pg-breathe 2.6s ease-in-out infinite;
+}
+
+.pg-root[data-armed] .pg-ball:hover .pg-btn-idle {
+  scale: 1.35;
+}
+
+/* Point de lumière initial : visible avant l'hydratation, il se dissout quand la Ball se dessine. */
+.pg-spark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow:
+    0 0 12px 4px rgb(255 215 94 / 90%),
+    0 0 46px 14px rgb(255 90 60 / 45%);
+  animation: pg-spark-pulse 1.2s ease-in-out infinite;
+}
+
+.pg-root:not([data-phase="pre"]) .pg-spark {
+  animation:
+    pg-spark-pulse 1.2s ease-in-out infinite,
+    pg-spark-out 900ms cubic-bezier(0.5, 0, 0.2, 1) var(--t-converge) forwards;
+}
+
+.pg-light {
+  inset: auto;
+  left: 50%;
+  top: 50%;
+  width: 100%;
+  height: 34%;
+  translate: -50% -50%;
+  background: radial-gradient(
+    closest-side,
+    #fff 0%,
+    #fff6d8 35%,
+    rgb(255 226 140 / 55%) 62%,
+    rgb(255 226 140 / 0%) 100%
+  );
+  mix-blend-mode: screen;
+  opacity: 0;
+}
+
+.pg-shadow {
+  position: absolute;
+  left: 50%;
+  top: 104%;
+  width: 70%;
+  height: 9%;
+  translate: -50% 0;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(0 0 0 / 60%), transparent);
+  animation:
+    pg-fade-in 600ms ease var(--t-fill) both,
+    pg-shadow 3.4s ease-in-out var(--t-ready) infinite;
+}
+
+.pg-aura,
+.pg-sonar,
+.pg-shock {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-radius: 50%;
+  pointer-events: none;
+  translate: -50% -50%;
+}
+
+/* Rayons « légendaires » qui apparaissent une fois la capture réussie. */
+.pg-aura {
+  width: 270%;
+  height: 270%;
+  background: repeating-conic-gradient(
+    from 0deg,
+    rgb(255 214 94 / 16%) 0deg 4deg,
+    rgb(255 214 94 / 0%) 4deg 15deg
+  );
+  mask-image: radial-gradient(closest-side, #000 22%, transparent 100%);
+  opacity: 0;
+  animation:
+    pg-aura-in 1400ms cubic-bezier(0.2, 0.8, 0.2, 1) var(--t-click) both,
+    pg-spin 70s linear infinite;
+}
+
+.pg-sonar {
+  width: 100%;
+  height: 100%;
+  border: 1.5px solid rgb(255 214 94 / 60%);
+  opacity: 0;
+}
+
+.pg-root[data-phase="ready"] .pg-sonar {
+  animation: pg-sonar 2.6s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
+}
+
+.pg-shock {
+  width: 100%;
+  height: 100%;
+  border: 2px solid rgb(255 226 140 / 90%);
+  opacity: 0;
+  animation: pg-shock 900ms cubic-bezier(0.2, 0.7, 0.3, 1) var(--t-click);
+}
+
+.pg-shock + .pg-shock {
+  border-color: rgb(255 255 255 / 60%);
+  animation-delay: calc(var(--t-click) + 130ms);
+}
+
+.pg-star {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--size) * 0.16 * var(--s));
+  height: calc(var(--size) * 0.16 * var(--s));
+  margin: calc(var(--size) * -0.08 * var(--s));
+  color: var(--gold);
+  opacity: 0;
+  filter: drop-shadow(0 0 6px rgb(255 214 94 / 90%));
+  animation: pg-star 1000ms cubic-bezier(0.15, 0.8, 0.3, 1) calc(var(--t-click) + 40ms) backwards;
+}
+
+.pg-star svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* ───────────── Titre ───────────── */
+
+.pg-title {
+  margin: clamp(22px, 5vh, 48px) 0 0;
+  font-family: var(--font-gate), var(--font-sans);
+  font-size: clamp(2.6rem, 8.2vw, 5.75rem);
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: #fff;
+}
+
+/* Masque : les lettres montent depuis la ligne de base. */
+.pg-word {
+  display: inline-flex;
+  clip-path: inset(-0.5em -0.6em 0 -0.6em);
+}
+
+.pg-l {
+  display: inline-block;
+  font-variation-settings: "wdth" 112, "wght" 780;
+  animation: pg-letter 1050ms cubic-bezier(0.2, 0.9, 0.25, 1) calc(var(--t-title) + var(--i) * 55ms) both;
+}
+
+.pg-l-accent {
+  color: var(--primary);
+  text-shadow: 0 0 36px rgb(255 214 94 / 30%);
+}
+
+.pg-tagline {
+  max-width: 34ch;
+  margin: 0.85rem 0 0;
+  font-size: clamp(0.95rem, 1.5vw, 1.125rem);
+  color: color-mix(in oklab, var(--foreground) 72%, transparent);
+  text-wrap: balance;
+  animation: pg-rise 850ms cubic-bezier(0.2, 0.8, 0.2, 1) calc(var(--t-title) + 520ms) both;
+}
+
+.pg-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: clamp(20px, 4.5vh, 40px) 0 0;
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+  animation: pg-rise 700ms ease var(--t-ready) both;
+}
+
+.pg-root kbd {
+  padding: 0.1rem 0.4rem;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-bottom-width: 2px;
+  border-radius: 0.35rem;
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--foreground);
+  background: rgb(255 255 255 / 5%);
+}
+
+@media (hover: none) {
+  .pg-root kbd {
+    display: none;
+  }
+}
+
+.pg-skip {
+  position: absolute;
+  top: max(16px, env(safe-area-inset-top));
+  right: 16px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid rgb(255 255 255 / 9%);
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+  background: rgb(255 255 255 / 4%);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  animation: pg-fade-in 600ms ease 700ms both;
+  transition:
+    color 200ms,
+    background-color 200ms;
+}
+
+.pg-skip:hover {
+  color: var(--foreground);
+  background: rgb(255 255 255 / 9%);
+}
+
+.pg-skip:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* ───────────── Cartes en profondeur ───────────── */
+
+.pg-cards {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  perspective: 1100px;
+  pointer-events: none;
+}
+
+.pg-card {
+  --cw: clamp(84px, 12.5vw, 210px);
+  --cx: var(--x);
+  --cy: var(--y);
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--cw);
+  aspect-ratio: 63 / 88;
+  margin-left: calc(var(--cw) / -2);
+  margin-top: calc(var(--cw) * -0.698);
+  transform-style: preserve-3d;
+  transform: translate3d(
+      calc(var(--cx) + var(--px) * var(--d) * 30px),
+      calc(var(--cy) + var(--py) * var(--d) * 22px),
+      calc(var(--z) + var(--zoom) * 1px)
+    )
+    rotateY(calc(var(--ry) + var(--px) * 10deg)) rotateX(calc(var(--py) * -8deg)) rotateZ(var(--r));
+  transition: opacity 650ms ease 250ms;
+}
+
+.pg-root[data-opened] .pg-card {
+  opacity: 0;
+}
+
+/* Distribution : chaque carte jaillit de la Ball en tournoyant, dos puis face. */
+.pg-card-fly,
+.pg-card-float {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+
+.pg-card-fly {
+  animation: pg-card-in 1250ms cubic-bezier(0.16, 1, 0.3, 1) calc(var(--t-cards) + var(--i) * 95ms) both;
+}
+
+.pg-card-float {
+  animation: pg-card-float 5.5s ease-in-out calc(var(--t-ready) + var(--i) * -900ms) infinite alternate;
+}
+
+.pg-face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 4.5% / 3.2%;
+  backface-visibility: hidden;
+  box-shadow: 0 30px 60px -24px rgb(0 0 0 / 80%);
+  filter: blur(var(--blur));
+}
+
+.pg-face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  -webkit-user-drag: none;
+}
+
+/* Feuille holographique et reflet, déplacés par le pointeur. */
+.pg-foil,
+.pg-glare {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.pg-foil {
+  background: repeating-linear-gradient(
+    115deg,
+    #ff7773 0%,
+    #ffed5f 7%,
+    #a8ff5f 14%,
+    #83fff7 21%,
+    #7894ff 28%,
+    #d875ff 35%,
+    #ff7773 42%
+  );
+  background-size: 260% 260%;
+  background-position: calc(50% + var(--px) * 70%) calc(50% + var(--py) * 70%);
+  mix-blend-mode: color-dodge;
+  opacity: 0.22;
+}
+
+.pg-glare {
+  background: radial-gradient(
+    circle at calc(50% - var(--px) * 45%) calc(35% - var(--py) * 45%),
+    rgb(255 255 255 / 45%),
+    transparent 45%
+  );
+  mix-blend-mode: overlay;
+}
+
+.pg-face-back {
+  display: grid;
+  place-items: center;
+  border: 5px solid #1d4396;
+  background:
+    repeating-conic-gradient(from 20deg at 50% 50%, rgb(255 255 255 / 6%) 0deg 10deg, transparent 10deg 30deg),
+    radial-gradient(ellipse at 50% 46%, #4d8ae6 0%, #1f4fa8 46%, #0c2257 100%);
+  transform: rotateY(180deg);
+}
+
+.pg-face-back svg {
+  width: 46%;
+  filter: drop-shadow(0 4px 10px rgb(0 0 0 / 40%));
+}
+
+/* ───────────── Ouverture ───────────── */
+
+.pg-root[data-opened] .pg-shake {
+  animation: pg-rattle 70ms linear 4 both;
+}
+
+.pg-root[data-opened] .pg-lid {
+  animation: pg-lid-open 640ms cubic-bezier(0.3, 1.35, 0.5, 1) 240ms forwards;
+}
+
+.pg-root[data-opened] .pg-light {
+  animation: pg-light 720ms cubic-bezier(0.2, 0.8, 0.2, 1) 270ms forwards;
+}
+
+.pg-root[data-opened] .pg-btn-idle {
+  animation: pg-btn-hot 300ms ease-out forwards;
+}
+
+.pg-root[data-opened] .pg-spec,
+.pg-root[data-opened] .pg-sonar,
+.pg-root[data-opened] .pg-hint {
+  opacity: 0;
+  animation: none;
+}
+
+.pg-flood {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at var(--bx, 50%) var(--by, 40%),
+    #fff 0%,
+    #fffaf0 30%,
+    #ffefc4 70%,
+    #ffe39a 100%
+  );
+  clip-path: circle(0 at var(--bx, 50%) var(--by, 40%));
+}
+
+.pg-root[data-opened] .pg-flood {
+  animation: pg-flood 580ms cubic-bezier(0.7, 0, 0.84, 0) 580ms forwards;
+}
+
+/* ───────────── Keyframes ───────────── */
+
+@keyframes pg-spark-pulse {
+  0%,
+  100% {
+    scale: 1;
+  }
+  50% {
+    scale: 1.5;
+  }
+}
+
+@keyframes pg-spark-out {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  55% {
+    transform: scale(3.2);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0);
+    opacity: 0;
+  }
+}
+
+@keyframes pg-draw {
+  from {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes pg-ink {
+  from {
+    stroke: #ffe39a;
+  }
+  to {
+    stroke: var(--ink);
+  }
+}
+
+@keyframes pg-ink-glow {
+  from {
+    filter: drop-shadow(0 0 4px rgb(255 214 94 / 95%)) drop-shadow(0 0 14px rgb(255 120 60 / 60%));
+  }
+  to {
+    filter: drop-shadow(0 0 0 rgb(255 214 94 / 0%)) drop-shadow(0 0 0 rgb(255 120 60 / 0%));
+  }
+}
+
+@keyframes pg-fill-lid {
+  from {
+    clip-path: inset(100% 0 0 0);
+  }
+  to {
+    clip-path: inset(0);
+  }
+}
+
+@keyframes pg-fill-base {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0);
+  }
+}
+
+@keyframes pg-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pg-sheen {
+  from {
+    translate: -110% 0;
+  }
+  to {
+    translate: 110% 0;
+  }
+}
+
+/* Secousse de capture : bascule autour du point de contact au sol, amortie. */
+@keyframes pg-shake {
+  0% {
+    transform: none;
+  }
+  12% {
+    transform: translateX(-4%) rotate(-18deg);
+  }
+  26% {
+    transform: translateX(3%) rotate(13deg);
+  }
+  37% {
+    transform: translateX(-1%) rotate(-5deg);
+  }
+  46%,
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes pg-blink {
+  0% {
+    opacity: 0;
+  }
+  14% {
+    opacity: 1;
+  }
+  42%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes pg-click {
+  0% {
+    transform: none;
+  }
+  32% {
+    transform: scale(1.08, 0.92);
+  }
+  66% {
+    transform: scale(0.97, 1.03);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes pg-shock {
+  from {
+    opacity: 1;
+    scale: 0.85;
+  }
+  to {
+    opacity: 0;
+    scale: 2.7;
+  }
+}
+
+@keyframes pg-star {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0) rotate(0deg);
+  }
+  16% {
+    opacity: 1;
+    transform: translate(calc(var(--sx) * var(--size) * 0.45), calc(var(--sy) * var(--size) * 0.45)) scale(1.25)
+      rotate(45deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--sx) * var(--size)), calc(var(--sy) * var(--size))) scale(0.4) rotate(var(--rot));
+  }
+}
+
+@keyframes pg-aura-in {
+  from {
+    opacity: 0;
+    scale: 0.5;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+@keyframes pg-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+@keyframes pg-float {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -4%;
+  }
+}
+
+@keyframes pg-shadow {
+  0%,
+  100% {
+    scale: 1;
+    opacity: 1;
+  }
+  50% {
+    scale: 0.82;
+    opacity: 0.65;
+  }
+}
+
+@keyframes pg-sonar {
+  from {
+    opacity: 0.55;
+    scale: 1;
+  }
+  to {
+    opacity: 0;
+    scale: 1.9;
+  }
+}
+
+@keyframes pg-breathe {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+/* Typo variable : les lettres jaillissent condensées et fines, s'étirent trop, puis se posent. */
+@keyframes pg-letter {
+  0% {
+    transform: translateY(108%);
+    font-variation-settings: "wdth" 50, "wght" 100;
+  }
+  55% {
+    transform: translateY(-7%);
+    font-variation-settings: "wdth" 150, "wght" 900;
+  }
+  100% {
+    transform: none;
+    font-variation-settings: "wdth" 112, "wght" 780;
+  }
+}
+
+@keyframes pg-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+@keyframes pg-card-in {
+  0% {
+    opacity: 0;
+    transform: translate3d(calc(var(--cx) * -1), calc(var(--cy) * -1), -900px) rotateY(-540deg)
+      rotateZ(calc(var(--r) * -4)) scale(0.35);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pg-card-float {
+  from {
+    transform: translate3d(0, -6px, 0) rotateZ(-0.8deg);
+  }
+  to {
+    transform: translate3d(0, 8px, 0) rotateZ(0.8deg);
+  }
+}
+
+@keyframes pg-rattle {
+  0%,
+  100% {
+    transform: none;
+  }
+  25% {
+    transform: rotate(-7deg);
+  }
+  75% {
+    transform: rotate(7deg);
+  }
+}
+
+/* Le couvercle bascule vers l'arrière autour de la charnière. */
+@keyframes pg-lid-open {
+  from {
+    transform: perspective(calc(var(--size) * 2)) rotateX(0deg);
+  }
+  to {
+    transform: perspective(calc(var(--size) * 2)) translateY(-6%) rotateX(74deg);
+  }
+}
+
+@keyframes pg-light {
+  0% {
+    opacity: 0;
+    scale: 0.2 0.05;
+  }
+  30% {
+    opacity: 1;
+    scale: 1 0.55;
+  }
+  100% {
+    opacity: 1;
+    scale: 3.2 2.6;
+  }
+}
+
+@keyframes pg-btn-hot {
+  to {
+    opacity: 1;
+    scale: 1.6;
+  }
+}
+
+@keyframes pg-flood {
+  from {
+    clip-path: circle(0 at var(--bx, 50%) var(--by, 40%));
+  }
+  to {
+    clip-path: circle(150vmax at var(--bx, 50%) var(--by, 40%));
+  }
+}
+
+@keyframes pg-site-in {
+  from {
+    opacity: 0.5;
+    scale: 1.035;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+/* ───────────── Responsive ───────────── */
+
+@media (max-width: 640px) {
+  .pg-card {
+    --cw: 23vw;
+    --cx: var(--mx);
+    --cy: var(--my);
+  }
+
+  .pg-card:nth-child(n + 5) {
+    display: none;
+  }
+}
+
+/* ───────────── Mouvement réduit : scène statique, simple fondu à l'entrée ───────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .pg-root *,
+  .pg-root *::before,
+  .pg-root *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .pg-canvas,
+  .pg-spark {
+    display: none;
+  }
+
+  .pg-root {
+    transition: opacity 300ms ease;
+  }
+
+  html[data-gate="reveal"] [data-app-shell] {
+    animation: none;
+  }
+}
