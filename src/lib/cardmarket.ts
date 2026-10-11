@@ -70,12 +70,14 @@ const store = globalThis as unknown as { __pokefolioCardmarket?: Record<string, 
 function memo<T>(name: string, load: () => Promise<T>): Promise<T> {
   const cache = (store.__pokefolioCardmarket ??= {});
   const hit = cache[name] as Entry<T> | undefined;
-  if (hit && Date.now() - hit.at < TTL_MS) return hit.promise;
+  // Horloge monotone : seule une durée compte ici, et `Date.now()` est interdit pendant le prérendu.
+  const now = performance.now();
+  if (hit && now - hit.at < TTL_MS) return hit.promise;
   const promise = load().catch((err) => {
     delete cache[name];
     throw err;
   });
-  cache[name] = { at: Date.now(), promise };
+  cache[name] = { at: now, promise };
   return promise;
 }
 

@@ -28,7 +28,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { DEFAULT_FEES } from "@/lib/analysis";
 import { CONDITIONS, LANGUAGES, SEALED_TYPES } from "@/lib/constants";
 import { dateText, eur, signedEur } from "@/lib/format";
-import { GRADING_COMPANIES } from "@/lib/graded-model";
+import { GRADING_COMPANIES, gradeQuote } from "@/lib/graded-model";
 import type { Lang } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Field, Hidden } from "./field";
@@ -146,7 +146,8 @@ export function AddHoldingDialog({
               checked={graded}
               onChange={(e) => {
                 setGraded(e.target.checked);
-                if (!e.target.checked) suggest(variant?.price);
+                // Cote proposée : PSA 10 (valeurs par défaut du sélecteur) ou carte brute.
+                suggest(e.target.checked && variant ? gradeQuote("PSA", "10", variant.price, ageYears, variant.sales).price : variant?.price);
               }}
               className="size-4 accent-[var(--primary)]"
             />

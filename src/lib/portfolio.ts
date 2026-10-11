@@ -37,7 +37,7 @@ export async function loadPortfolio() {
   // Anciennes lignes (« normal »/« reverse ») : on enregistre la variante exacte une fois résolue.
   const legacy = open.filter((h) => {
     const q = quotes.get(h.id);
-    return q?.variantKey && (q.variantKey !== h.variant || !h.variantLabel);
+    return q?.variantKey && (q.variantKey !== h.variant || q.variantLabel !== h.variantLabel);
   });
   await Promise.all(
     legacy.map((h) => {

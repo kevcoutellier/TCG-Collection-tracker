@@ -24,6 +24,11 @@ export const JA_SERIES_LABELS: Record<string, string> = {
   M: "MEGA",
 };
 
+/** Cardmarket range parfois les produits asiatiques ensemble : « 30th Celebration Simplified Chinese » → « 30th Celebration ». */
+function stripRegion(label: string | null): string | null {
+  return label?.replace(/\s+(?:(?:Simplified|Traditional) Chinese|Korean|Indonesian(?: & Thai)?|Thai|JP)$/i, "").trim() || null;
+}
+
 export interface JapaneseSet extends SetSummary {
   englishName: string | null;
   idExpansion: number | null;
@@ -63,7 +68,7 @@ export async function getJapaneseSets(): Promise<JapaneseSet[]> {
       serieId: set.serie.id,
       serieLabel: JA_SERIES_LABELS[set.serie.id] ?? set.serie.id,
       idExpansion,
-      englishName: idExpansion ? await getExpansionLabel(idExpansion).catch(() => null) : null,
+      englishName: idExpansion ? stripRegion(await getExpansionLabel(idExpansion).catch(() => null)) : null,
     };
   });
   return sets

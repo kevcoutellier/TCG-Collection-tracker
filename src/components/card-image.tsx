@@ -31,7 +31,7 @@ export function CardImage({
   const current = candidates[attempt];
 
   return (
-    <div className={cn("holo relative aspect-[63/88] overflow-hidden rounded-[4.5%/3.2%] bg-muted", className)}>
+    <div className={cn("holo @container relative aspect-[63/88] overflow-hidden rounded-[4.5%/3.2%] bg-muted", className)}>
       {current ? (
         // eslint-disable-next-line @next/next/no-img-element -- images distantes TCGdex déjà optimisées en WebP
         <img
@@ -44,9 +44,9 @@ export function CardImage({
           className="size-full object-cover"
         />
       ) : (
-        <div className="flex size-full flex-col items-center justify-center gap-2 p-3 text-center text-muted-foreground">
-          <PokeballIcon className="size-8 opacity-40" />
-          <span className="line-clamp-3 text-[11px] leading-tight">{alt}</span>
+        <div className="flex size-full flex-col items-center justify-center gap-2 p-[8%] text-center text-muted-foreground">
+          <PokeballIcon className="size-1/2 max-w-8 opacity-40" />
+          <span className="hidden text-[11px] leading-tight @[96px]:line-clamp-3">{alt}</span>
         </div>
       )}
     </div>

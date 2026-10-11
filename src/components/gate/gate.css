@@ -48,7 +48,7 @@ html[data-gate="reveal"] [data-app-shell] {
   touch-action: manipulation;
   user-select: none;
   transition:
-    --zoom 950ms cubic-bezier(0.55, 0, 0.8, 0.2),
+    --zoom 950ms cubic-bezier(0.42, 0, 1, 1),
     opacity 650ms ease;
 }
 
@@ -240,18 +240,13 @@ html[data-gate="reveal"] [data-app-shell] {
   transition: opacity 200ms;
 }
 
-/* Balayage de lumière : à la fin du remplissage, puis au clic de capture. */
+/* Balayage de lumière : à la fin du remplissage, puis au clic de capture.
+   Le dégradé glisse sur le disque lui-même (le border-radius le découpe, sans overflow à recadrer). */
 .pg-sheen {
-  overflow: hidden;
-}
-
-.pg-sheen::before {
-  content: "";
-  position: absolute;
-  inset: -25%;
-  background: linear-gradient(115deg, transparent 38%, rgb(255 255 255 / 70%) 50%, transparent 62%);
+  background: linear-gradient(115deg, transparent 42%, rgb(255 255 255 / 70%) 50%, transparent 58%) no-repeat;
+  background-size: 300% 100%;
+  background-position: 100% 0;
   mix-blend-mode: overlay;
-  translate: -110% 0;
   animation:
     pg-sheen 900ms cubic-bezier(0.4, 0, 0.2, 1) calc(var(--t-fill) + 380ms) both,
     pg-sheen 900ms cubic-bezier(0.4, 0, 0.2, 1) var(--t-click);
@@ -538,7 +533,7 @@ html[data-gate="reveal"] [data-app-shell] {
       calc(var(--z) + var(--zoom) * 1px)
     )
     rotateY(calc(var(--ry) + var(--px) * 10deg)) rotateX(calc(var(--py) * -8deg)) rotateZ(var(--r));
-  transition: opacity 650ms ease 250ms;
+  transition: opacity 420ms ease-in 480ms;
 }
 
 .pg-root[data-opened] .pg-card {
@@ -756,10 +751,10 @@ html[data-gate="reveal"] [data-app-shell] {
 
 @keyframes pg-sheen {
   from {
-    translate: -110% 0;
+    background-position: 100% 0;
   }
   to {
-    translate: 110% 0;
+    background-position: 0% 0;
   }
 }
 
@@ -970,7 +965,7 @@ html[data-gate="reveal"] [data-app-shell] {
     transform: perspective(calc(var(--size) * 2)) rotateX(0deg);
   }
   to {
-    transform: perspective(calc(var(--size) * 2)) translateY(-6%) rotateX(74deg);
+    transform: perspective(calc(var(--size) * 2)) translateY(-10%) rotateX(66deg);
   }
 }
 

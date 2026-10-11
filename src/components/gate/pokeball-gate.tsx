@@ -314,6 +314,8 @@ export function PokeballGate() {
                   <span className="pg-half pg-base">
                     <BallHalf side="base" />
                   </span>
+                  {/* La lumière jaillit entre les deux moitiés : sous le couvercle, devant la base. */}
+                  <span className="pg-light" />
                   <span className="pg-half pg-lid">
                     <BallHalf side="lid" />
                   </span>
@@ -321,7 +323,6 @@ export function PokeballGate() {
                   <span className="pg-sheen" />
                   <span className="pg-btn-blink" />
                   <span className="pg-btn-idle" />
-                  <span className="pg-light" />
                   <span className="pg-spark" />
                 </span>
               </span>
