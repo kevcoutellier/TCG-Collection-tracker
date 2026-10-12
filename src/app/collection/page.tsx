@@ -1,4 +1,4 @@
-import { Download, Layers, Plus, Search } from "lucide-react";
+import { Camera, Download, Layers, Plus, Search } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { after } from "next/server";
@@ -37,6 +37,10 @@ async function CollectionContent() {
         <Plus />
         Carte
       </Link>
+      <Link href="/scanner" className={buttonVariants({ variant: "outline" })}>
+        <Camera />
+        Scanner
+      </Link>
       <AddSealedDialog today={today} />
       <RefreshPricesButton />
       <a href="/api/export" className={buttonVariants({ variant: "ghost" })} download>
@@ -53,11 +57,15 @@ async function CollectionContent() {
         <EmptyState
           icon={<Layers />}
           title="Votre collection est vide"
-          description="Recherchez une carte pour l'ajouter avec son prix d'achat, ou enregistrez un produit scellé (display, ETB…)."
+          description="Recherchez une carte ou photographiez vos cartes pour les ajouter avec leur prix d'achat, ou enregistrez un produit scellé (display, ETB…)."
         >
           <Link href="/recherche" className={buttonVariants()}>
             <Search />
             Rechercher une carte
+          </Link>
+          <Link href="/scanner" className={buttonVariants({ variant: "outline" })}>
+            <Camera />
+            Scanner des cartes
           </Link>
           <AddSealedDialog today={today} />
         </EmptyState>

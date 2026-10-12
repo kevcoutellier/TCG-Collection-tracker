@@ -6,6 +6,7 @@ import type {
   Lang,
   SerieDetail,
   SetDetail,
+  SetSummary,
 } from "./types";
 
 // Client de l'API publique TCGdex : données des cartes + guide des prix Cardmarket/TCGplayer.
@@ -92,6 +93,13 @@ export async function searchJapaneseBriefs(query: string): Promise<CardBrief[]> 
     return lists.flatMap((l) => l ?? []).filter((c) => !seen.has(c.id) && Boolean(seen.add(c.id)));
   }
   return [];
+}
+
+/** Liste à plat de toutes les extensions d'une langue (nom, total imprimé), sans les cartes. */
+export async function getSetList(lang: Lang = "fr"): Promise<SetSummary[]> {
+  "use cache";
+  cacheLife("days");
+  return (await api<SetSummary[]>(lang, "/sets")) ?? [];
 }
 
 export async function getSet(id: string, lang: Lang = "fr"): Promise<SetDetail | null> {

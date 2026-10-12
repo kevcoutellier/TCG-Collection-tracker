@@ -2,11 +2,14 @@
 
 import {
   BrainCircuit,
+  Camera,
   Eye,
+  GitCompareArrows,
   Layers,
   LayoutDashboard,
   Library,
   Menu,
+  Radar,
   Search,
   TrendingUp,
 } from "lucide-react";
@@ -21,9 +24,12 @@ import { cn } from "@/lib/utils";
 export const NAV = [
   { href: "/", label: "Tableau de bord", icon: LayoutDashboard },
   { href: "/collection", label: "Ma collection", icon: Layers },
+  { href: "/scanner", label: "Scanner des cartes", icon: Camera },
   { href: "/watchlist", label: "Watchlist", icon: Eye },
+  { href: "/opportunites", label: "Opportunités", icon: Radar },
   { href: "/analyse", label: "Analyse & stratégie", icon: BrainCircuit },
   { href: "/marche", label: "Marché", icon: TrendingUp },
+  { href: "/comparateur", label: "Comparateur", icon: GitCompareArrows },
   { href: "/recherche", label: "Recherche", icon: Search },
   { href: "/sets", label: "Extensions", icon: Library },
 ] as const;

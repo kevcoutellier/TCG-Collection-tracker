@@ -1,6 +1,7 @@
 import {
   ArrowRight,
   BellRing,
+  Camera,
   BrainCircuit,
   Layers,
   LineChart,
@@ -257,6 +258,10 @@ function Welcome({ today }: { today: string }) {
             <Link href="/recherche" className={buttonVariants({ size: "lg" })}>
               <Search />
               Ajouter ma première carte
+            </Link>
+            <Link href="/scanner" className={buttonVariants({ variant: "outline", size: "lg" })}>
+              <Camera />
+              Scanner mes cartes
             </Link>
             <AddSealedDialog today={today} />
             <Link href="/marche" className={buttonVariants({ variant: "ghost", size: "lg" })}>

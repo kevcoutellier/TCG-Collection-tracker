@@ -5,6 +5,7 @@ import { refresh } from "next/cache";
 import { z } from "zod";
 import { conditionValues, languageValues, sealedValues } from "@/lib/constants";
 import { priceKey } from "@/lib/analysis";
+import { mapLimit } from "@/lib/async";
 import { getDb, schema } from "@/lib/db";
 import { todayISO } from "@/lib/format";
 import { recordCardSnapshot, recordKeySnapshot, recordManualSnapshot, refreshTrackedPrices } from "@/lib/snapshots";
@@ -49,6 +50,15 @@ const cardHoldingSchema = z.object({
   grade: optionalText(20),
   manualPrice: optionalMoney,
   notes: optionalText(1000),
+});
+
+/** Cartes identifiées par le scanner photo, ajoutées en une fois à la même date d'achat. */
+const scannedSchema = z.object({
+  purchaseDate: isoDate,
+  items: z
+    .array(cardHoldingSchema.omit({ purchaseDate: true, manualPrice: true, notes: true }))
+    .min(1, "Aucune carte à ajouter")
+    .max(100, "100 cartes au maximum par ajout"),
 });
 
 const sealedSchema = z.object({
@@ -132,6 +142,30 @@ export async function addCardHolding(_: ActionState, formData: FormData): Promis
     }
     refresh();
     return { ok: true, message: `« ${data.name} » ajoutée à votre collection` };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function addScannedCards(input: unknown): Promise<ActionState> {
+  try {
+    const { purchaseDate, items } = scannedSchema.parse(input);
+    const db = await getDb();
+    const rows = await db
+      .insert(schema.holdings)
+      .values(items.map((item) => ({ kind: "card" as const, ...item, purchaseDate, notes: "Ajoutée par le scanner photo" })))
+      .returning({ id: schema.holdings.id });
+    // Relevé du jour pour chaque carte (et chaque note gradée) : l'historique démarre tout de suite.
+    const cards = [...new Map(items.map((i) => [`${i.cardLang}:${i.cardId}`, i])).values()];
+    await mapLimit(cards, 4, (i) => snapshotCard(i.cardId, i.cardLang));
+    await mapLimit(
+      items.flatMap((item, i) => (item.gradingCompany && item.grade ? [{ item, id: rows[i].id }] : [])),
+      4,
+      ({ item, id }) => snapshotQuote({ id, kind: "card", ...item, productId: null, manualPrice: null }),
+    );
+    refresh();
+    const count = items.reduce((a, i) => a + i.quantity, 0);
+    return { ok: true, message: `${count} carte${count > 1 ? "s" : ""} ajoutée${count > 1 ? "s" : ""} à votre collection` };
   } catch (e) {
     return fail(e);
   }

@@ -10,8 +10,10 @@ import {
   Cell,
   ComposedChart,
   Line,
+  LineChart,
   Pie,
   PieChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -45,11 +47,13 @@ function ChartTooltip({
   payload,
   label,
   labelFormatter = (l: string) => dateText(l),
+  valueFormatter = eur,
 }: {
   active?: boolean;
   payload?: TooltipEntry[];
   label?: string | number;
   labelFormatter?: (label: string) => string;
+  valueFormatter?: (value: number) => string;
 }) {
   if (!active || !payload?.length) return null;
   return (
@@ -61,7 +65,7 @@ function ChartTooltip({
             <span className="size-2 rounded-full" style={{ background: p.color }} />
             {p.name}
           </span>
-          <span className="num font-medium">{typeof p.value === "number" ? eur(p.value) : "—"}</span>
+          <span className="num font-medium">{typeof p.value === "number" ? valueFormatter(p.value) : "—"}</span>
         </div>
       ))}
     </div>
@@ -184,6 +188,54 @@ export function MomentumChart({ data, height = 180 }: { data: { label: string; v
         </Bar>
       </BarChart>
     </ResponsiveContainer>
+  );
+}
+
+/** Dynamique de plusieurs cartes ramenée à une base 100 (moyenne 30 j), pour les comparer quel que soit leur prix. */
+export function IndexedMomentumChart({
+  data,
+  series,
+  height = 240,
+}: {
+  data: Record<string, string | number | null>[];
+  series: { key: string; label: string }[];
+  height?: number;
+}) {
+  return (
+    <div>
+      <ResponsiveContainer width="100%" height={height}>
+        <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+          <CartesianGrid stroke="var(--border)" vertical={false} />
+          <XAxis dataKey="label" {...axis} />
+          <YAxis width={40} domain={["auto", "auto"]} {...axis} />
+          <ReferenceLine y={100} stroke="var(--muted-foreground)" strokeDasharray="4 4" />
+          <Tooltip
+            content={<ChartTooltip labelFormatter={(l) => l} valueFormatter={(v) => String(Math.round(v))} />}
+            cursor={{ stroke: "var(--border)" }}
+          />
+          {series.map((sr, i) => (
+            <Line
+              isAnimationActive={false}
+              key={sr.key}
+              type="monotone"
+              dataKey={sr.key}
+              name={sr.label}
+              stroke={PALETTE[i % PALETTE.length]}
+              strokeWidth={2}
+              connectNulls
+            />
+          ))}
+        </LineChart>
+      </ResponsiveContainer>
+      <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-xs">
+        {series.map((sr, i) => (
+          <li key={sr.key} className="flex items-center gap-1.5">
+            <span className="size-2.5 rounded-full" style={{ background: PALETTE[i % PALETTE.length] }} />
+            {sr.label}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

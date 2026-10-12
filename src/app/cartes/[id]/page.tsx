@@ -1,4 +1,4 @@
-import { Award, ChevronRight, ExternalLink, Info, Layers } from "lucide-react";
+import { Award, ChevronRight, ExternalLink, Info, Layers, ShoppingCart } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -7,10 +7,12 @@ import { cache, Suspense } from "react";
 import { CardImage } from "@/components/card-image";
 import { setHref } from "@/components/card-tile";
 import { MomentumChart, PriceHistoryChart } from "@/components/charts";
+import { CompareButton } from "@/components/compare-picker";
 import { Delta, MoneyDelta } from "@/components/delta";
 import { AddHoldingDialog } from "@/components/forms/holding-forms";
 import { WatchDialog } from "@/components/forms/watch-forms";
 import { GradedPricePanel, type GradedVariantOption } from "@/components/graded";
+import { EbayOffers, MarketplaceRow } from "@/components/marketplace";
 import { ScoreRing, SignalBadge } from "@/components/score";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,9 +20,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { analyzeCard, momentum, setAgeYears, volatility } from "@/lib/analysis";
 import { getExpansionLabelForCard } from "@/lib/cardmarket";
 import { DISCLAIMER } from "@/lib/constants";
+import { ebayConfigured } from "@/lib/ebay";
 import { dateText, eur, pctText, todayISO, usd } from "@/lib/format";
 import { getGradedSales, gradedSalesConfigured } from "@/lib/graded";
 import type { SalesByGrade } from "@/lib/graded-model";
+import { cardQuery, marketplaceLinks } from "@/lib/marketplaces";
 import { loadCardTracking } from "@/lib/portfolio";
 import { cardVariants, primaryVariant } from "@/lib/pricing";
 import { recordCardSnapshot } from "@/lib/snapshots";
@@ -175,6 +179,15 @@ async function CardPageContent({
           </header>
 
           <VariantTable variants={variants} primaryKey={primary.key} fx={fx} />
+
+          <BuyPanel
+            name={card.name}
+            query={cardQuery({ name: card.name, localId: card.localId, total: official })}
+            localId={card.localId}
+            total={official ?? null}
+            variant={primary}
+            fx={fx}
+          />
 
           <Card>
             <CardHeader>
@@ -334,6 +347,71 @@ function VariantTable({ variants, primaryKey, fx }: { variants: CardVariant[]; p
   );
 }
 
+function BuyPanel({
+  name,
+  query,
+  localId,
+  total,
+  variant,
+  fx,
+}: {
+  name: string;
+  query: string;
+  localId: string;
+  total: number | null;
+  variant: CardVariant;
+  fx: number;
+}) {
+  const p = variant.price;
+  const links = marketplaceLinks({ query, name, maxPrice: p.price, tcgplayerId: variant.tcgplayerId });
+  const ebay = ebayConfigured();
+  return (
+    <Card size="sm">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <ShoppingCart className="size-4 text-primary" /> Acheter au meilleur prix
+        </CardTitle>
+        <CardDescription>
+          Recherche « {query} » sur chaque site, triée par prix croissant
+          {p.price != null ? ` et plafonnée à la cote du jour (${eur(p.price)}) : tout ce qui s'affiche est sous le marché` : ""}.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="divide-y">
+          {links.map((l) => (
+            <MarketplaceRow key={l.id} link={l}>
+              {l.id === "cardmarket" ? (
+                <>
+                  Tendance <span className="num text-foreground">{eur(p.trend ?? p.price)}</span> · annonce la moins chère{" "}
+                  <span className="num text-foreground">{eur(p.low)}</span> (tous états et langues)
+                </>
+              ) : l.id === "tcgplayer" ? (
+                <>
+                  Market <span className="num text-foreground">{usd(p.usdMarket)}</span>
+                  {p.usdMarket != null && (
+                    <>
+                      {" "}
+                      ≈ <span className="num text-foreground">{eur(p.usdMarket * fx)}</span>
+                    </>
+                  )}{" "}
+                  · hors port, TVA et frais d&apos;import
+                </>
+              ) : l.id === "ebay" && ebay ? (
+                "Annonces en direct ci-dessous, port compris"
+              ) : undefined}
+            </MarketplaceRow>
+          ))}
+        </div>
+        {ebay && (
+          <Suspense fallback={<Skeleton className="h-32 w-full rounded-lg" />}>
+            <EbayOffers query={query} number={localId} total={total} maxPrice={p.price != null ? p.price * 1.1 : null} reference={p.price} />
+          </Suspense>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 async function CardActions({
   cardRef,
   variants,
@@ -351,6 +429,7 @@ async function CardActions({
     <div className="mt-5 flex flex-wrap items-center gap-2">
       <AddHoldingDialog card={cardRef} variants={variants} ageYears={ageYears} today={todayISO()} />
       <WatchDialog card={cardRef} variants={variants} existing={watch} />
+      <CompareButton id={cardRef.cardId} lang={cardRef.cardLang} />
       {qty > 0 && (
         <Link href="/collection" className="inline-flex items-center gap-1.5 rounded-lg bg-muted px-3 py-1.5 text-sm hover:bg-accent">
           <Layers className="size-4 text-primary" />

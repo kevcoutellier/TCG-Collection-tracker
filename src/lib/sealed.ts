@@ -1,6 +1,8 @@
 import { cacheLife } from "next/cache";
 import { getSealedExpansionList, getSealedProducts, normalizeSetName, searchSealedProducts, type SealedProduct } from "./cardmarket";
 import { getJapaneseSets } from "./japan";
+import { POKEMON_FR_EN } from "./pokemon-names";
+import { getSetList } from "./tcgdex";
 
 // Données du sélecteur de produits scellés : extensions Cardmarket enrichies du nom français
 // (via TCGdex) et repérage des extensions japonaises.
@@ -8,11 +10,7 @@ import { getJapaneseSets } from "./japan";
 async function getFrenchSetNames(): Promise<Record<string, string>> {
   "use cache";
   cacheLife("days");
-  const load = async (lang: "en" | "fr") => {
-    const res = await fetch(`https://api.tcgdex.net/v2/${lang}/sets`, { headers: { accept: "application/json" } });
-    return res.ok ? ((await res.json()) as { id: string; name: string }[]) : [];
-  };
-  const [en, fr] = await Promise.all([load("en"), load("fr")]);
+  const [en, fr] = await Promise.all([getSetList("en"), getSetList("fr")]);
   const frById = new Map(fr.map((s) => [s.id, s.name]));
   const out: Record<string, string> = {};
   for (const s of en) {
@@ -70,23 +68,7 @@ const SYNONYMS: Record<string, string | string[]> = {
   upc: ["ultrapremiumcollection", "upc"],
   pokebox: "tin",
   tripack: ["3pack", "tripack"],
-  dracaufeu: "charizard",
-  noctali: "umbreon",
-  evoli: "eevee",
-  mentali: "espeon",
-  pyroli: "flareon",
-  aquali: "vaporeon",
-  voltali: "jolteon",
-  phyllali: "leafeon",
-  givrali: "glaceon",
-  nymphali: "sylveon",
-  tortank: "blastoise",
-  florizarre: "venusaur",
-  ectoplasma: "gengar",
-  amphinobi: "greninja",
-  dracolosse: "dragonite",
-  ronflex: "snorlax",
-  salameche: "charmander",
+  ...POKEMON_FR_EN,
 };
 const STOPWORDS = new Set(["coffret", "dresseur", "de", "du", "des", "la", "le", "les", "l", "d", "et", "boite", "pokemon"]);
 

@@ -2,8 +2,9 @@ import { priceFromPricing } from "./pricing";
 import type { CardmarketPricing, PriceInfo } from "./types";
 
 // Catalogue public de Cardmarket (mis à jour quotidiennement) : liste des produits Pokémon et
-// guide des prix. On s'en sert pour coter automatiquement les produits scellés et pour retrouver
-// le nom anglais d'une extension (y compris japonaise) à partir d'une carte.
+// guide des prix. On s'en sert pour coter automatiquement les produits scellés, pour retrouver
+// le nom anglais d'une extension (y compris japonaise) à partir d'une carte et pour scanner
+// l'ensemble des cartes à la recherche d'opportunités.
 const BASE = "https://downloads.s3.cardmarket.com/productCatalog";
 const TTL_MS = 6 * 60 * 60 * 1000;
 
@@ -115,14 +116,31 @@ export function expansionLabel(names: string[]): string | null {
   return clean.length === 1 ? clean[0] : null;
 }
 
+interface PriceGuide {
+  prices: Map<number, RawPrice>;
+  updated: string | null;
+}
+
+/** Guide des prix de tous les produits Pokémon (cartes et scellé), téléchargé une seule fois. */
+function getPriceGuide(): Promise<PriceGuide> {
+  return memo("guide", async () => {
+    const guide = await download<{ createdAt?: string; priceGuides: RawPrice[] }>("priceGuide/price_guide_6.json");
+    return { prices: new Map(guide.priceGuides.map((p) => [p.idProduct, p])), updated: guide.createdAt ?? null };
+  });
+}
+
+function getSinglesList(): Promise<RawProduct[]> {
+  return memo("singles-list", async () => (await download<{ products: RawProduct[] }>("productList/products_singles_6.json")).products);
+}
+
 function getSealedCatalog(): Promise<SealedCatalog> {
   // Clé versionnée : un changement de format invalide le cache mémoire (rechargement à chaud).
-  return memo("sealed-v4", async () => {
+  return memo("sealed-v5", async () => {
     const [list, guide] = await Promise.all([
       download<{ products: RawProduct[] }>("productList/products_nonsingles_6.json"),
-      download<{ createdAt?: string; priceGuides: RawPrice[] }>("priceGuide/price_guide_6.json"),
+      getPriceGuide(),
     ]);
-    const prices = new Map(guide.priceGuides.map((p) => [p.idProduct, p]));
+    const prices = guide.prices;
     const products = new Map<number, SealedProduct>();
     const expansions = new Map<number, SealedExpansion & { ids: number[]; names: string[] }>();
     for (const p of list.products) {
@@ -161,16 +179,48 @@ function getSealedCatalog(): Promise<SealedCatalog> {
       e.misc = label == null;
       e.label = label ?? `Coffrets et produits divers (${e.count})`;
     }
-    return { products, expansions, updated: guide.createdAt ?? null };
+    return { products, expansions, updated: guide.updated };
   });
 }
 
 /** idProduct (carte) → idExpansion : relie une carte TCGdex à son extension Cardmarket. */
 export function getSinglesExpansionMap(): Promise<Map<number, number>> {
-  return memo("singles", async () => {
-    const list = await download<{ products: RawProduct[] }>("productList/products_singles_6.json");
-    return new Map(list.products.map((p) => [p.idProduct, p.idExpansion]));
+  return memo("singles-v2", async () => new Map((await getSinglesList()).map((p) => [p.idProduct, p.idExpansion])));
+}
+
+export interface SingleProduct {
+  idProduct: number;
+  /** Nom anglais Cardmarket (« Charizard ex »). */
+  name: string;
+  idExpansion: number;
+  dateAdded: string | null;
+  price: PriceInfo;
+}
+
+/** Toutes les cartes à l'unité cotées par Cardmarket (version normale, sans le reverse). */
+export async function getSinglesWithPrices(): Promise<{ singles: SingleProduct[]; updated: string | null }> {
+  return memo("singles-priced", async () => {
+    const [list, guide] = await Promise.all([getSinglesList(), getPriceGuide()]);
+    const singles: SingleProduct[] = [];
+    for (const p of list) {
+      const cm = guide.prices.get(p.idProduct);
+      if (!cm) continue;
+      singles.push({
+        idProduct: p.idProduct,
+        name: p.name,
+        idExpansion: p.idExpansion,
+        dateAdded: p.dateAdded && !p.dateAdded.startsWith("0000") ? p.dateAdded.slice(0, 10) : null,
+        price: priceFromPricing({ cardmarket: cm }, { holo: false, tcgKeys: [] }, 1),
+      });
+    }
+    return { singles, updated: guide.updated };
   });
+}
+
+/** Libellés anglais des extensions Cardmarket (déduits de leurs produits scellés). */
+export async function getExpansionLabels(): Promise<Map<number, string>> {
+  const cat = await getSealedCatalog();
+  return new Map([...cat.expansions.values()].filter((e) => !e.misc).map((e) => [e.id, e.label]));
 }
 
 export async function getSealedProduct(idProduct: number): Promise<SealedProduct | null> {
@@ -226,6 +276,11 @@ export async function getExpansionLabelForCard(cardmarketId: number | null | und
   } catch {
     return null;
   }
+}
+
+/** Nom d'une carte Cardmarket sans sa mention de version : « Charizard ex (V.2) » → « Charizard ex ». */
+export function baseCardName(name: string): string {
+  return name.replace(/\s*[([][^)\]]*[)\]]\s*$/, "").trim();
 }
 
 /** Normalisation pour comparer des noms d'extension entre sources. */
