@@ -243,6 +243,8 @@ export interface HoldingInput {
   variant: VariantKey;
   /** Produit Cardmarket (scellé) coté automatiquement. */
   productId?: number | null;
+  /** Langue de l'exemplaire (« FR », « EN »…). */
+  language?: string;
   gradingCompany: string | null;
   grade: string | null;
   quantity: number;
@@ -254,11 +256,12 @@ export interface HoldingInput {
   saleFees: number | null;
 }
 
-export type PriceSource = "market" | "sealed" | "sales" | "estimate" | "manual" | "none";
+export type PriceSource = "market" | "sealed" | "ebay" | "sales" | "estimate" | "manual" | "none";
 
 export const PRICE_SOURCE_LABELS: Record<PriceSource, string> = {
   market: "Cardmarket",
   sealed: "Cardmarket · toutes langues",
+  ebay: "eBay.fr · annonces FR",
   sales: "Ventes gradées",
   estimate: "Estimation gradée",
   manual: "Valeur manuelle",
@@ -545,10 +548,11 @@ export const sealedKey = (productId: number) => `cm:${productId}`;
  * Cardmarket, ou la ligne elle-même quand sa valeur est saisie à la main.
  */
 export function priceKey(
-  h: Pick<HoldingInput, "id" | "kind" | "cardId" | "variant" | "manualPrice" | "productId" | "gradingCompany" | "grade">,
+  h: Pick<HoldingInput, "id" | "kind" | "cardId" | "variant" | "manualPrice" | "productId" | "language" | "gradingCompany" | "grade">,
 ): string {
   if (h.manualPrice != null) return `manual:${h.id}`;
-  if (h.kind === "sealed") return h.productId ? sealedKey(h.productId) : `manual:${h.id}`;
+  // Un scellé français a sa propre cote (marché français) : relevés séparés des autres langues.
+  if (h.kind === "sealed") return h.productId ? `${sealedKey(h.productId)}${h.language === "FR" ? ":FR" : ""}` : `manual:${h.id}`;
   if (!h.cardId) return `manual:${h.id}`;
   return h.gradingCompany && h.grade ? gradedKey(h.cardId, h.variant, h.gradingCompany, h.grade) : cardKey(h.cardId, h.variant);
 }

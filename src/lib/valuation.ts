@@ -1,6 +1,7 @@
 import { setAgeYears, type UnitQuote } from "./analysis";
 import { mapLimit } from "./async";
 import { getSealedProduct } from "./cardmarket";
+import { type FrenchMarket, getFrenchSealedMarket } from "./ebay";
 import { getGradedSales } from "./graded";
 import { gradeQuote } from "./graded-model";
 import { cardVariants, findVariant } from "./pricing";
@@ -8,7 +9,8 @@ import { getCard, getSet, getUsdToEur } from "./tcgdex";
 import type { CardDetail, Lang, VariantKey } from "./types";
 
 // Cote automatique de chaque ligne du portefeuille : carte brute (variante exacte), carte gradée
-// (ventes réelles ou estimation) ou produit scellé (guide des prix Cardmarket).
+// (ventes réelles ou estimation) ou produit scellé (annonces eBay.fr pour un exemplaire français,
+// sinon guide des prix Cardmarket).
 
 export interface HoldingRef {
   id: string;
@@ -17,6 +19,8 @@ export interface HoldingRef {
   cardLang: Lang;
   variant: VariantKey;
   productId?: number | null;
+  /** Langue de l'exemplaire (« FR ») : un scellé français est coté sur le marché français. */
+  language?: string;
   gradingCompany: string | null;
   grade: string | null;
 }
@@ -27,6 +31,8 @@ export interface HoldingQuote extends UnitQuote {
   variantLabel?: string;
   /** Produit Cardmarket d'un scellé, pour le lien vers sa page. */
   cardmarket?: { name: string; path: string | null };
+  /** Marché français d'un scellé (annonces eBay.fr). */
+  french?: FrenchMarket | null;
 }
 
 const cardRef = (lang: Lang, id: string) => `${lang}:${id}`;
@@ -56,11 +62,14 @@ export async function quoteHoldings(rows: HoldingRef[], now: Date = new Date()):
     if (r.kind === "sealed") {
       const product = r.productId ? await getSealedProduct(r.productId).catch(() => null) : null;
       if (product) {
+        const french = r.language === "FR" ? await getFrenchSealedMarket(product) : null;
         out.set(r.id, {
-          price: product.price.price,
-          source: "sealed",
+          price: french?.summary?.price ?? product.price.price,
+          source: french?.summary ? "ebay" : "sealed",
+          // La dynamique reste celle de Cardmarket : eBay ne donne que les annonces du jour.
           momentumFrom: product.price,
           cardmarket: { name: product.name, path: product.path },
+          french,
         });
       }
       return;

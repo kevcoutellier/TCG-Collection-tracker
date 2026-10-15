@@ -46,35 +46,54 @@ function ItemCell({ p }: { p: HoldingRow }) {
 }
 
 /**
- * Détail de la cote d'un scellé : la tendance Cardmarket agrège toute l'Europe et toutes les langues,
- * d'où le lien vers les offres dans la langue de l'exemplaire.
+ * Détail de la cote d'un scellé : annonces eBay.fr pour un exemplaire français, sinon tendance Cardmarket
+ * (toute l'Europe, toutes langues) ; l'autre source pour comparer et des liens pour vérifier.
  */
 function SealedMarket({ p }: { p: PositionView }) {
   const m = p.marketPrice;
+  const fr = p.french?.summary;
   const language = LANGUAGES.find((l) => l.value === p.marketLink?.language)?.label.toLowerCase();
-  const range = [m?.low != null && `dès ${eur(m.low)}`, m?.avg30 != null && `30 j ${eur(m.avg30)}`].filter(Boolean).join(" · ");
+  const detail =
+    p.priceSource === "ebay" && fr
+      ? `${fr.count} annonces · dès ${eur(fr.low)}`
+      : p.priceSource === "sealed"
+        ? [m?.low != null && `dès ${eur(m.low)}`, m?.avg30 != null && `30 j ${eur(m.avg30)}`].filter(Boolean).join(" · ")
+        : "";
   return (
     <div className="text-[11px] leading-snug text-muted-foreground">
-      {p.priceSource === "manual" && m?.price != null && <div>Cardmarket {eur(m.price)}</div>}
-      {range && <div>{range}</div>}
-      {p.marketLink && (
-        <a
-          href={p.marketLink.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          title={language ? `Offres en ${language} sur Cardmarket` : "Voir le produit sur Cardmarket"}
-          className="inline-flex items-center gap-0.5 text-primary hover:underline"
-        >
-          {p.marketLink.language ? `Offres ${p.marketLink.language}` : "Cardmarket"}
-          <ExternalLink className="size-3" />
-        </a>
-      )}
+      {detail && <div>{detail}</div>}
+      {p.priceSource !== "ebay" && fr && <div>eBay.fr {eur(fr.price)}</div>}
+      {p.priceSource !== "sealed" && m?.price != null && <div>Cardmarket {eur(m.price)}</div>}
+      <div className="flex justify-end gap-2">
+        {p.french && (
+          <a href={p.french.soldUrl} target="_blank" rel="noopener noreferrer" title="Ventes conclues sur eBay.fr" className={LINK}>
+            Vendus eBay
+            <ExternalLink className="size-3" />
+          </a>
+        )}
+        {p.marketLink && (
+          <a
+            href={p.marketLink.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={language ? `Offres en ${language} sur Cardmarket` : "Voir le produit sur Cardmarket"}
+            className={LINK}
+          >
+            Cardmarket{p.marketLink.language ? ` ${p.marketLink.language}` : ""}
+            <ExternalLink className="size-3" />
+          </a>
+        )}
+      </div>
     </div>
   );
 }
 
-const SEALED_SOURCE_HINT =
-  "Tendance Cardmarket : ventes de toute l'Europe, toutes langues confondues. Une version précise (FR…) peut se vendre plus cher.";
+const LINK = "inline-flex items-center gap-0.5 text-primary hover:underline";
+
+const SOURCE_HINTS: Partial<Record<PositionView["priceSource"], string>> = {
+  sealed: "Tendance Cardmarket : ventes de toute l'Europe, toutes langues confondues. Une version précise (FR…) peut se vendre plus cher.",
+  ebay: "Médiane des annonces à prix fixe en cours sur eBay.fr (neuf, vendeurs en France) : prix demandés, pas des ventes conclues.",
+};
 
 const th = "px-3 py-2 text-left text-xs font-medium text-muted-foreground whitespace-nowrap";
 const td = "px-3 py-2.5 align-middle whitespace-nowrap";
@@ -111,7 +130,7 @@ export function PositionsTable({ positions, today }: { positions: PositionView[]
               </td>
               <td className={`${td} num text-right`}>
                 {eur(p.unitPrice)}
-                <div className="text-xs text-muted-foreground" title={p.priceSource === "sealed" ? SEALED_SOURCE_HINT : undefined}>
+                <div className="text-xs text-muted-foreground" title={SOURCE_HINTS[p.priceSource]}>
                   {PRICE_SOURCE_LABELS[p.priceSource]}
                 </div>
                 {p.kind === "sealed" && <SealedMarket p={p} />}

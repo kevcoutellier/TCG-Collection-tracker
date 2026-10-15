@@ -160,7 +160,18 @@ export async function addSealedHolding(_: ActionState, formData: FormData): Prom
       if (data.purchaseDate < todayISO()) await recordManualSnapshot(row.id, data.purchasePrice, data.purchaseDate);
       await recordManualSnapshot(row.id, manualPrice);
     } else {
-      await snapshotQuote({ id: row.id, kind: "sealed", cardId: null, cardLang: "fr", variant: "normal", productId: data.productId, gradingCompany: null, grade: null, manualPrice: null });
+      await snapshotQuote({
+        id: row.id,
+        kind: "sealed",
+        cardId: null,
+        cardLang: "fr",
+        variant: "normal",
+        productId: data.productId,
+        language: data.language,
+        gradingCompany: null,
+        grade: null,
+        manualPrice: null,
+      });
     }
     refresh();
     return { ok: true, message: `« ${data.name} » ajouté à votre collection` };
