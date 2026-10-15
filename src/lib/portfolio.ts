@@ -1,4 +1,4 @@
-import { asc, desc, eq, inArray, like } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, like } from "drizzle-orm";
 import { connection } from "next/server";
 import {
   analyzeCard,
@@ -10,24 +10,28 @@ import {
   valueHolding,
 } from "./analysis";
 import { mapLimit } from "./async";
+import { requireUser } from "./auth/session";
 import { getDb, schema } from "./db";
 import { todayISO } from "./format";
 import { cardVariants, findVariant } from "./pricing";
 import { getCard, getUsdToEur } from "./tcgdex";
 import { quoteHoldings } from "./valuation";
 
-// Chargement des données utilisateur (base locale) enrichies des prix du marché.
+// Chargement des données de l'utilisateur connecté, enrichies des prix du marché.
 // `connection()` exclut ces lectures du prérendu : elles s'exécutent à chaque requête.
+// Chaque chargeur résout lui-même l'utilisateur : impossible de lire la collection d'un autre compte.
 
 export type HoldingRow = typeof schema.holdings.$inferSelect;
 export type WatchRow = typeof schema.watchlist.$inferSelect;
 
 export async function loadPortfolio() {
   await connection();
+  const user = await requireUser();
   const db = await getDb();
   const rows = await db
     .select()
     .from(schema.holdings)
+    .where(eq(schema.holdings.userId, user.id))
     .orderBy(desc(schema.holdings.purchaseDate), desc(schema.holdings.createdAt));
   const open = rows.filter((r) => !r.soldAt);
   const sold = rows.filter((r) => r.soldAt);
@@ -75,8 +79,13 @@ export async function loadPortfolioHistory(rows: HoldingRow[]) {
 
 export async function loadWatchlist() {
   await connection();
+  const user = await requireUser();
   const db = await getDb();
-  const rows = await db.select().from(schema.watchlist).orderBy(desc(schema.watchlist.createdAt));
+  const rows = await db
+    .select()
+    .from(schema.watchlist)
+    .where(eq(schema.watchlist.userId, user.id))
+    .orderBy(desc(schema.watchlist.createdAt));
   const fx = await getUsdToEur();
   const cards = await mapLimit(rows, 12, (r) => getCard(r.cardId, r.cardLang).catch(() => null));
   return rows.map((r, i) => {
@@ -100,13 +109,20 @@ export async function loadWatchlist() {
 
 export type WatchView = Awaited<ReturnType<typeof loadWatchlist>>[number];
 
-/** Suivi d'une carte précise : exemplaires détenus, surveillance et historique des relevés par variante. */
+/** Suivi d'une carte précise : exemplaires détenus, surveillance et historique des relevés par variante (communs à tous). */
 export async function loadCardTracking(cardId: string) {
   await connection();
+  const user = await requireUser();
   const db = await getDb();
   const [owned, watch, snaps] = await Promise.all([
-    db.select().from(schema.holdings).where(eq(schema.holdings.cardId, cardId)),
-    db.select().from(schema.watchlist).where(eq(schema.watchlist.cardId, cardId)),
+    db
+      .select()
+      .from(schema.holdings)
+      .where(and(eq(schema.holdings.userId, user.id), eq(schema.holdings.cardId, cardId))),
+    db
+      .select()
+      .from(schema.watchlist)
+      .where(and(eq(schema.watchlist.userId, user.id), eq(schema.watchlist.cardId, cardId))),
     db
       .select()
       .from(schema.priceSnapshots)

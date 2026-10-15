@@ -6,14 +6,37 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import type { HoldingKind } from "../analysis";
 import type { Lang, VariantKey } from "../types";
 
+/** Comptes : chacun a sa propre collection et sa propre watchlist. */
+export const users = pgTable("users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  /** Pseudo de connexion, stocké en minuscules. */
+  username: text("username").notNull().unique(),
+  /** Empreinte scrypt du mot de passe (voir lib/auth/crypto.ts). */
+  passwordHash: text("password_hash").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Sessions ouvertes : seule l'empreinte SHA-256 du jeton est stockée, le jeton reste dans le cookie. */
+export const sessions = pgTable("sessions", {
+  id: text("id").primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 /** Lignes du portefeuille : cartes (raw ou gradées) et produits scellés. */
 export const holdings = pgTable("holdings", {
   id: uuid("id").primaryKey().defaultRandom(),
+  /** Propriétaire ; nul uniquement pour les lignes antérieures aux comptes, pas encore rattachées. */
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
   kind: text("kind").$type<HoldingKind>().notNull(),
   cardId: text("card_id"),
   cardLang: text("card_lang").$type<Lang>().notNull().default("fr"),
@@ -44,21 +67,27 @@ export const holdings = pgTable("holdings", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const watchlist = pgTable("watchlist", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  cardId: text("card_id").notNull().unique(),
-  cardLang: text("card_lang").$type<Lang>().notNull().default("fr"),
-  name: text("name").notNull(),
-  setName: text("set_name"),
-  image: text("image"),
-  rarity: text("rarity"),
-  variant: text("variant").$type<VariantKey>().notNull().default("normal"),
-  variantLabel: text("variant_label"),
-  /** Prix d'achat visé : alerte quand le marché passe en dessous. */
-  targetPrice: doublePrecision("target_price"),
-  note: text("note"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const watchlist = pgTable(
+  "watchlist",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    cardId: text("card_id").notNull(),
+    cardLang: text("card_lang").$type<Lang>().notNull().default("fr"),
+    name: text("name").notNull(),
+    setName: text("set_name"),
+    image: text("image"),
+    rarity: text("rarity"),
+    variant: text("variant").$type<VariantKey>().notNull().default("normal"),
+    variantLabel: text("variant_label"),
+    /** Prix d'achat visé : alerte quand le marché passe en dessous. */
+    targetPrice: doublePrecision("target_price"),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  // Une carte n'est surveillée qu'une fois par compte.
+  (t) => [uniqueIndex("watchlist_user_card_idx").on(t.userId, t.cardId)],
+);
 
 /** Un relevé de prix par jour et par objet suivi : c'est ce qui construit l'historique. */
 export const priceSnapshots = pgTable(
@@ -114,7 +143,7 @@ CREATE INDEX IF NOT EXISTS holdings_card_id_idx ON holdings (card_id);
 
 CREATE TABLE IF NOT EXISTS watchlist (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  card_id text NOT NULL UNIQUE,
+  card_id text NOT NULL,
   card_lang text NOT NULL DEFAULT 'fr',
   name text NOT NULL,
   set_name text,
@@ -148,4 +177,26 @@ CREATE TABLE IF NOT EXISTS app_meta (
 ALTER TABLE holdings ADD COLUMN IF NOT EXISTS variant_label text;
 ALTER TABLE holdings ADD COLUMN IF NOT EXISTS product_id integer;
 ALTER TABLE watchlist ADD COLUMN IF NOT EXISTS variant_label text;
+
+-- v3 : comptes utilisateurs, chaque collection est rattachée à son propriétaire
+CREATE TABLE IF NOT EXISTS users (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  username text NOT NULL UNIQUE,
+  password_hash text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  id text PRIMARY KEY,
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expires_at timestamptz NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS sessions_user_id_idx ON sessions (user_id);
+
+ALTER TABLE holdings ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES users(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS holdings_user_id_idx ON holdings (user_id);
+ALTER TABLE watchlist ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES users(id) ON DELETE CASCADE;
+ALTER TABLE watchlist DROP CONSTRAINT IF EXISTS watchlist_card_id_key;
+CREATE UNIQUE INDEX IF NOT EXISTS watchlist_user_card_idx ON watchlist (user_id, card_id);
 `;
