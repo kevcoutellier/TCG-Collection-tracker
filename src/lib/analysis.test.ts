@@ -200,6 +200,7 @@ describe("historique", () => {
   it("choisit la clé d'historique selon la nature de la ligne", () => {
     expect(priceKey(holding({ id: "z", kind: "sealed", cardId: null }))).toBe("manual:z");
     expect(priceKey(holding({ id: "z", kind: "sealed", cardId: null, productId: 42 }))).toBe(sealedKey(42));
+    expect(priceKey(holding({ id: "z", kind: "sealed", cardId: null, productId: 42, language: "FR" }))).toBe(`${sealedKey(42)}:FR`);
     expect(priceKey(holding({ id: "z", manualPrice: 5 }))).toBe("manual:z");
     expect(priceKey(holding({ id: "z", variant: "abc" }))).toBe("z::abc");
     expect(priceKey(holding({ id: "z", variant: "abc", gradingCompany: "PSA", grade: "10" }))).toBe(gradedKey("z", "abc", "PSA", "10"));

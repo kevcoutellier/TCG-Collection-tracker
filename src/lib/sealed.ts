@@ -1,5 +1,12 @@
 import { cacheLife } from "next/cache";
-import { getSealedExpansionList, getSealedProducts, normalizeSetName, searchSealedProducts, type SealedProduct } from "./cardmarket";
+import {
+  getExpansionLabel,
+  getSealedExpansionList,
+  getSealedProducts,
+  normalizeSetName,
+  searchSealedProducts,
+  type SealedProduct,
+} from "./cardmarket";
 import { getJapaneseSets } from "./japan";
 
 // Données du sélecteur de produits scellés : extensions Cardmarket enrichies du nom français
@@ -20,6 +27,12 @@ async function getFrenchSetNames(): Promise<Record<string, string>> {
     if (name) out[normalizeSetName(s.name)] = name;
   }
   return out;
+}
+
+/** Nom français d'une extension Cardmarket (« Évolutions Prismatiques ») ; null si inconnu. */
+export async function getFrenchExpansionName(idExpansion: number): Promise<string | null> {
+  const [label, frNames] = await Promise.all([getExpansionLabel(idExpansion), getFrenchSetNames()]);
+  return label ? (frNames[normalizeSetName(label)] ?? null) : null;
 }
 
 /** Résout une promesse ou abandonne après `ms` (le calcul continue et remplit le cache). */

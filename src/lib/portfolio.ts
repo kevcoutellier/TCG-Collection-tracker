@@ -63,6 +63,7 @@ export async function loadPortfolio() {
       marketPrice: quote?.momentumFrom ?? null,
       // Scellé : page Cardmarket filtrée sur la langue de l'exemplaire (la cote mélange toutes les langues).
       marketLink: quote?.cardmarket ? cardmarketProductLink(quote.cardmarket, h.language) : null,
+      french: quote?.french ?? null,
     };
   });
   const summary = summarizePortfolio(positions, sold);
