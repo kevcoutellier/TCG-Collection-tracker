@@ -1,4 +1,4 @@
-import { eq, isNull } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { cardKey, priceKey } from "./analysis";
 import { mapLimit } from "./async";
 import { getDb, schema } from "./db";
@@ -43,12 +43,21 @@ export async function recordKeySnapshot(itemKey: string, price: number | null, d
   await upsertSnapshot(itemKey, { price }, day);
 }
 
-/** Relève le prix du jour de toutes les cartes et produits détenus ou surveillés. */
-export async function refreshTrackedPrices() {
+/**
+ * Relève le prix du jour des cartes et produits détenus ou surveillés : ceux d'un compte, ou de tous les comptes
+ * (cron, relevé quotidien). Les relevés sont communs : une carte suivie par deux comptes n'est relevée qu'une fois.
+ */
+export async function refreshTrackedPrices(userId?: string) {
   const db = await getDb();
   const [held, watched] = await Promise.all([
-    db.select().from(schema.holdings).where(isNull(schema.holdings.soldAt)),
-    db.select({ cardId: schema.watchlist.cardId, cardLang: schema.watchlist.cardLang }).from(schema.watchlist),
+    db
+      .select()
+      .from(schema.holdings)
+      .where(and(isNull(schema.holdings.soldAt), userId ? eq(schema.holdings.userId, userId) : undefined)),
+    db
+      .select({ cardId: schema.watchlist.cardId, cardLang: schema.watchlist.cardLang })
+      .from(schema.watchlist)
+      .where(userId ? eq(schema.watchlist.userId, userId) : undefined),
   ]);
   const targets = new Map<string, { id: string; lang: Lang }>();
   for (const t of [...held, ...watched]) if (t.cardId) targets.set(`${t.cardLang}:${t.cardId}`, { id: t.cardId, lang: t.cardLang });
@@ -64,7 +73,7 @@ export async function refreshTrackedPrices() {
   const quotes = await quoteHoldings(auto);
   for (const h of auto) await recordKeySnapshot(priceKey(h), quotes.get(h.id)?.price ?? null);
 
-  await setMeta("lastRefresh", todayISO());
+  if (!userId) await setMeta("lastRefresh", todayISO());
   return { tracked: targets.size + auto.filter((h) => h.kind === "sealed").length, updated: results.filter(Boolean).length + auto.length };
 }
 
