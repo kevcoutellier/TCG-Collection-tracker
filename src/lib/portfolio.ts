@@ -11,6 +11,7 @@ import {
 } from "./analysis";
 import { mapLimit } from "./async";
 import { requireUser } from "./auth/session";
+import { cardmarketProductLink } from "./cardmarket-link";
 import { getDb, schema } from "./db";
 import { todayISO } from "./format";
 import { cardVariants, findVariant } from "./pricing";
@@ -57,7 +58,12 @@ export async function loadPortfolio() {
 
   const positions = open.map((h) => {
     const quote = quotes.get(h.id) ?? null;
-    return { ...valueHolding(h, quote), marketPrice: quote?.momentumFrom ?? null };
+    return {
+      ...valueHolding(h, quote),
+      marketPrice: quote?.momentumFrom ?? null,
+      // Scellé : page Cardmarket filtrée sur la langue de l'exemplaire (la cote mélange toutes les langues).
+      marketLink: quote?.cardmarket ? cardmarketProductLink(quote.cardmarket, h.language) : null,
+    };
   });
   const summary = summarizePortfolio(positions, sold);
   return { rows, positions, sold, summary, insights: portfolioInsights(positions, summary) };

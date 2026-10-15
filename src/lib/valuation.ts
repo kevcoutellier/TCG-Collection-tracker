@@ -25,6 +25,8 @@ export interface HoldingQuote extends UnitQuote {
   /** Clé de variante résolue (les anciennes clés « normal »/« reverse » sont converties). */
   variantKey?: string;
   variantLabel?: string;
+  /** Produit Cardmarket d'un scellé, pour le lien vers sa page. */
+  cardmarket?: { name: string; path: string | null };
 }
 
 const cardRef = (lang: Lang, id: string) => `${lang}:${id}`;
@@ -53,7 +55,14 @@ export async function quoteHoldings(rows: HoldingRef[], now: Date = new Date()):
   await mapLimit(rows, 8, async (r) => {
     if (r.kind === "sealed") {
       const product = r.productId ? await getSealedProduct(r.productId).catch(() => null) : null;
-      if (product) out.set(r.id, { price: product.price.price, source: "sealed", momentumFrom: product.price });
+      if (product) {
+        out.set(r.id, {
+          price: product.price.price,
+          source: "sealed",
+          momentumFrom: product.price,
+          cardmarket: { name: product.name, path: product.path },
+        });
+      }
       return;
     }
     if (!r.cardId) return;
