@@ -258,7 +258,7 @@ export type PriceSource = "market" | "sealed" | "sales" | "estimate" | "manual" 
 
 export const PRICE_SOURCE_LABELS: Record<PriceSource, string> = {
   market: "Cardmarket",
-  sealed: "Cardmarket (scellé)",
+  sealed: "Cardmarket · toutes langues",
   sales: "Ventes gradées",
   estimate: "Estimation gradée",
   manual: "Valeur manuelle",

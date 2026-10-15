@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Loader2, PackagePlus, Pencil, Plus, Search, Tag, Trash2 } from "lucide-react";
+import { ArrowLeft, ExternalLink, Loader2, PackagePlus, Pencil, Plus, Search, Tag, Trash2 } from "lucide-react";
 import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
@@ -26,6 +26,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { DEFAULT_FEES } from "@/lib/analysis";
+import { cardmarketProductLink } from "@/lib/cardmarket-link";
 import { CONDITIONS, LANGUAGES, SEALED_TYPES } from "@/lib/constants";
 import { dateText, eur, signedEur } from "@/lib/format";
 import { GRADING_COMPANIES, gradeQuote } from "@/lib/graded-model";
@@ -241,7 +242,10 @@ interface ProductOption {
   type: string;
   dateAdded: string | null;
   price: number | null;
+  low: number | null;
   avg30: number | null;
+  /** Chemin de la page produit sur Cardmarket. */
+  path: string | null;
   expansion?: string | null;
 }
 
@@ -428,6 +432,7 @@ export function AddSealedDialog({ today, variant = "outline" }: { today: string;
   const [mode, setMode] = useState<"catalog" | "manual">("catalog");
   const [selected, setSelected] = useState<{ product: ProductOption; expansion: string; jp: boolean } | null>(null);
   const [price, setPrice] = useState("");
+  const [language, setLanguage] = useState("FR");
   const [, formAction, pending] = useDialogAction(addSealedHolding, () => setOpen(false));
 
   const reset = (o: boolean) => {
@@ -436,10 +441,17 @@ export function AddSealedDialog({ today, variant = "outline" }: { today: string;
       setSelected(null);
       setMode("catalog");
       setPrice("");
+      setLanguage("FR");
     }
   };
 
   const showForm = mode === "manual" || selected;
+  const link = selected ? cardmarketProductLink(selected.product, language) : null;
+  const range = selected
+    ? [selected.product.low != null && `dès ${eur(selected.product.low)}`, selected.product.avg30 != null && `30 j ${eur(selected.product.avg30)}`]
+        .filter(Boolean)
+        .join(" · ")
+    : "";
 
   return (
     <Dialog open={open} onOpenChange={reset} disablePointerDismissal>
@@ -451,7 +463,8 @@ export function AddSealedDialog({ today, variant = "outline" }: { today: string;
         <DialogHeader>
           <DialogTitle>Ajouter un produit scellé</DialogTitle>
           <DialogDescription>
-            Choisissez l&apos;extension puis le produit : sa cote Cardmarket est récupérée et mise à jour automatiquement.
+            Choisissez l&apos;extension puis le produit : sa cote Cardmarket (toutes langues, toute l&apos;Europe) est récupérée et
+            mise à jour automatiquement.
           </DialogDescription>
         </DialogHeader>
 
@@ -461,6 +474,7 @@ export function AddSealedDialog({ today, variant = "outline" }: { today: string;
               onSelect={(product, expansion, jp) => {
                 setSelected({ product, expansion, jp });
                 setPrice(product.price?.toFixed(2) ?? "");
+                setLanguage(jp ? "JP" : "FR");
               }}
             />
             <button type="button" onClick={() => setMode("manual")} className="text-left text-xs text-muted-foreground underline-offset-2 hover:underline">
@@ -491,9 +505,16 @@ export function AddSealedDialog({ today, variant = "outline" }: { today: string;
                       Changer de produit
                     </button>
                   </div>
-                  <div className="text-right">
-                    <div className="num font-semibold">{eur(selected.product.price)}</div>
-                    <div className="text-[11px] text-muted-foreground">cote Cardmarket</div>
+                  <div className="shrink-0 text-right text-[11px] text-muted-foreground">
+                    <div className="num text-sm font-semibold text-foreground">{eur(selected.product.price)}</div>
+                    <div>cote Cardmarket, toutes langues</div>
+                    {range && <div className="num">{range}</div>}
+                    {link && (
+                      <a href={link.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-primary hover:underline">
+                        {link.language ? `Voir les offres ${link.language}` : "Voir sur Cardmarket"}
+                        <ExternalLink className="size-3" />
+                      </a>
+                    )}
                   </div>
                 </div>
               </>
@@ -521,7 +542,7 @@ export function AddSealedDialog({ today, variant = "outline" }: { today: string;
 
             <div className="grid grid-cols-2 gap-3">
               <Field label="Langue" htmlFor="language">
-                <NativeSelect id="language" name="language" defaultValue={selected?.jp ? "JP" : "FR"} key={selected?.product.idProduct ?? "manual"}>
+                <NativeSelect id="language" name="language" value={language} onChange={(e) => setLanguage(e.target.value)}>
                   {LANGUAGES.map((l) => (
                     <option key={l.value} value={l.value}>
                       {l.label}

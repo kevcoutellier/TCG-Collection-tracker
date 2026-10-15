@@ -57,7 +57,9 @@ function toOption(p: SealedProduct & { expansion?: string }) {
     type: p.type,
     dateAdded: p.dateAdded,
     price: p.price.price,
+    low: p.price.low,
     avg30: p.price.avg30,
+    path: p.path,
     expansion: p.expansion ?? null,
   };
 }

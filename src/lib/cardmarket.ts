@@ -1,3 +1,4 @@
+import { cardmarketSlug } from "./cardmarket-link";
 import { priceFromPricing } from "./pricing";
 import type { CardmarketPricing, PriceInfo } from "./types";
 
@@ -20,14 +21,16 @@ type RawPrice = CardmarketPricing & { idProduct: number; idCategory?: number };
 
 export type SealedType = "display" | "etb" | "coffret" | "booster" | "tripack" | "tin" | "deck" | "bundle" | "other";
 
-const CATEGORIES: Record<string, { type: SealedType; label: string; order: number }> = {
-  "Pokémon Display": { type: "display", label: "Display", order: 1 },
-  "Pokémon Elite Trainer Boxes": { type: "etb", label: "Coffret Dresseur d'Élite", order: 2 },
-  "Pokémon Box Set": { type: "coffret", label: "Coffret", order: 3 },
+// `slug` : rubrique du produit dans les adresses du site (relevées sur cardmarket.com) ; sans
+// elle, le lien vers Cardmarket passe par la recherche.
+const CATEGORIES: Record<string, { type: SealedType; label: string; order: number; slug?: string }> = {
+  "Pokémon Display": { type: "display", label: "Display", order: 1, slug: "Booster-Boxes" },
+  "Pokémon Elite Trainer Boxes": { type: "etb", label: "Coffret Dresseur d'Élite", order: 2, slug: "Elite-Trainer-Boxes" },
+  "Pokémon Box Set": { type: "coffret", label: "Coffret", order: 3, slug: "Box-Sets" },
   "PCG Set": { type: "coffret", label: "Coffret", order: 3 },
-  "Pokémon Booster": { type: "booster", label: "Booster", order: 4 },
-  "Pokémon Blisters": { type: "tripack", label: "Blister / Tripack", order: 5 },
-  "Pokémon Tins": { type: "tin", label: "Pokébox / Tin", order: 6 },
+  "Pokémon Booster": { type: "booster", label: "Booster", order: 4, slug: "Boosters" },
+  "Pokémon Blisters": { type: "tripack", label: "Blister / Tripack", order: 5, slug: "Blisters" },
+  "Pokémon Tins": { type: "tin", label: "Pokébox / Tin", order: 6, slug: "Tins" },
   "Pokémon Theme Decks": { type: "deck", label: "Deck", order: 7 },
   "Pokémon Trainer Kits": { type: "deck", label: "Kit du dresseur", order: 7 },
   "Pokémon Lot": { type: "bundle", label: "Lot", order: 8 },
@@ -42,6 +45,8 @@ export interface SealedProduct {
   idExpansion: number;
   dateAdded: string | null;
   price: PriceInfo;
+  /** Chemin de la page produit sur Cardmarket (« Elite-Trainer-Boxes/151-Elite-Trainer-Box »), null si incertain. */
+  path: string | null;
 }
 
 export interface SealedExpansion {
@@ -115,14 +120,23 @@ export function expansionLabel(names: string[]): string | null {
   return clean.length === 1 ? clean[0] : null;
 }
 
+/** Chemin de la page Cardmarket d'un produit, ou null si la rubrique ou le nom ne permettent pas de le déduire. */
+export function productPath(categorySlug: string | undefined, name: string, homonyms = 1): string | null {
+  const slug = cardmarketSlug(name);
+  return categorySlug && slug && homonyms <= 1 ? `${categorySlug}/${slug}` : null;
+}
+
 function getSealedCatalog(): Promise<SealedCatalog> {
   // Clé versionnée : un changement de format invalide le cache mémoire (rechargement à chaud).
-  return memo("sealed-v4", async () => {
+  return memo("sealed-v5", async () => {
     const [list, guide] = await Promise.all([
       download<{ products: RawProduct[] }>("productList/products_nonsingles_6.json"),
       download<{ createdAt?: string; priceGuides: RawPrice[] }>("priceGuide/price_guide_6.json"),
     ]);
     const prices = new Map(guide.priceGuides.map((p) => [p.idProduct, p]));
+    // Cardmarket distingue les homonymes par un suffixe (« -V1 », « -V2 ») qu'on ne peut pas deviner.
+    const homonyms = new Map<string, number>();
+    for (const p of list.products) homonyms.set(p.name, (homonyms.get(p.name) ?? 0) + 1);
     const products = new Map<number, SealedProduct>();
     const expansions = new Map<number, SealedExpansion & { ids: number[]; names: string[] }>();
     for (const p of list.products) {
@@ -138,6 +152,7 @@ function getSealedCatalog(): Promise<SealedCatalog> {
         idExpansion: p.idExpansion,
         dateAdded: date,
         price: priceFromPricing({ cardmarket: prices.get(p.idProduct) ?? null }, { holo: false, tcgKeys: [] }, 1),
+        path: productPath(cat.slug, p.name, homonyms.get(p.name) ?? 0),
       });
       const e = expansions.get(p.idExpansion) ?? {
         id: p.idExpansion,
