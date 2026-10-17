@@ -5,6 +5,9 @@ import { Suspense } from "react";
 import { setHref } from "@/components/card-tile";
 import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
+import { requireUser } from "@/lib/auth/session";
+import { countOfficial } from "@/lib/collection";
+import { ownedCardIdsBySet } from "@/lib/collection-db";
 import { dateText } from "@/lib/format";
 import { getJapaneseSets, type JapaneseSet } from "@/lib/japan";
 import { getSeriesWithSets } from "@/lib/tcgdex";
@@ -18,7 +21,7 @@ export default function SetsPage({ searchParams }: PageProps<"/sets">) {
     <>
       <PageHeader
         title="Extensions"
-        description="Toutes les extensions du JCC Pokémon, internationales et japonaises, de la plus récente à la plus ancienne. Ouvrez-en une pour voir toutes ses cartes et leur cote."
+        description="Toutes les extensions du JCC Pokémon, internationales et japonaises, de la plus récente à la plus ancienne. Ouvrez-en une pour cocher les cartes que vous possédez."
       />
       <Suspense fallback={<Skeleton className="h-96 rounded-xl" />}>
         <SetsContent searchParams={searchParams} />
@@ -58,7 +61,32 @@ async function SetsContent({ searchParams }: Pick<PageProps<"/sets">, "searchPar
   );
 }
 
-function SetTile({ href, logo, symbol, title, subtitle, meta }: { href: string; logo?: string; symbol?: string; title: string; subtitle?: string | null; meta: string }) {
+/** Avancement d'une extension pour sa vignette : cartes officielles possédées, secrètes à part. */
+function tileProgress(owned: Map<string, string[]>, set: { id: string; cardCount: { official: number; total: number } }) {
+  const ids = owned.get(set.id);
+  if (!ids?.length) return undefined;
+  const official = set.cardCount.official || set.cardCount.total;
+  return { owned: countOfficial(ids, official, set.cardCount.total), official };
+}
+
+function SetTile({
+  href,
+  logo,
+  symbol,
+  title,
+  subtitle,
+  meta,
+  progress,
+}: {
+  href: string;
+  logo?: string;
+  symbol?: string;
+  title: string;
+  subtitle?: string | null;
+  meta: string;
+  progress?: { owned: number; official: number };
+}) {
+  const pct = progress ? Math.min(100, Math.round((progress.owned / progress.official) * 100)) : 0;
   return (
     <Link
       href={href}
@@ -75,14 +103,29 @@ function SetTile({ href, logo, symbol, title, subtitle, meta }: { href: string; 
       </div>
       <div className="line-clamp-2 text-sm font-medium">{title}</div>
       {subtitle && <div className="line-clamp-1 text-xs text-muted-foreground">{subtitle}</div>}
-      <div className="text-xs text-muted-foreground">{meta}</div>
+      {progress ? (
+        <div className="mt-auto w-full space-y-1">
+          <div className="num flex justify-between text-xs">
+            <span>
+              {progress.owned} / {progress.official}
+            </span>
+            <span className={cn("font-semibold", pct === 100 ? "text-primary" : "text-muted-foreground")}>{pct} %</span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+            <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
+          </div>
+        </div>
+      ) : (
+        <div className="text-xs text-muted-foreground">{meta}</div>
+      )}
     </Link>
   );
 }
 
 async function SetsList() {
   await connection();
-  const series = await getSeriesWithSets("fr");
+  const [series, user] = await Promise.all([getSeriesWithSets("fr"), requireUser()]);
+  const owned = await ownedCardIdsBySet(user.id);
   return (
     <div className="space-y-10">
       <nav className="flex flex-wrap gap-2" aria-label="Séries">
@@ -100,7 +143,15 @@ async function SetsList() {
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
             {serie.sets.map((set) => (
-              <SetTile key={set.id} href={setHref(set.id)} logo={set.logo} symbol={set.symbol} title={set.name} meta={`${set.cardCount.total} cartes`} />
+              <SetTile
+                key={set.id}
+                href={setHref(set.id)}
+                logo={set.logo}
+                symbol={set.symbol}
+                title={set.name}
+                meta={`${set.cardCount.total} cartes`}
+                progress={tileProgress(owned, set)}
+              />
             ))}
           </div>
         </section>
@@ -111,7 +162,8 @@ async function SetsList() {
 
 async function JapaneseSetsList() {
   await connection();
-  const sets = await getJapaneseSets();
+  const [sets, user] = await Promise.all([getJapaneseSets(), requireUser()]);
+  const owned = await ownedCardIdsBySet(user.id);
   const groups: { id: string; label: string; sets: JapaneseSet[] }[] = [];
   for (const s of sets) {
     let g = groups.find((x) => x.id === s.serieId);
@@ -143,6 +195,7 @@ async function JapaneseSetsList() {
                 title={set.englishName ?? set.name}
                 subtitle={set.englishName ? set.name : set.id}
                 meta={`${set.id} · ${set.cardCount.total} cartes${set.releaseDate ? ` · ${set.releaseDate.slice(0, 4)}` : ""}`}
+                progress={tileProgress(owned, set)}
               />
             ))}
           </div>

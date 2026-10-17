@@ -3,6 +3,7 @@
 import {
   BrainCircuit,
   Eye,
+  House,
   Layers,
   LayoutDashboard,
   Library,
@@ -14,18 +15,24 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { PokeballIcon } from "@/components/card-image";
-import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
 export const NAV = [
   { href: "/", label: "Tableau de bord", icon: LayoutDashboard },
-  { href: "/collection", label: "Ma collection", icon: Layers },
+  { href: "/sets", label: "Extensions", icon: Library },
+  { href: "/recherche", label: "Recherche", icon: Search },
+  { href: "/collection", label: "Portefeuille", icon: Layers },
   { href: "/watchlist", label: "Watchlist", icon: Eye },
   { href: "/analyse", label: "Analyse & stratégie", icon: BrainCircuit },
   { href: "/marche", label: "Marché", icon: TrendingUp },
-  { href: "/recherche", label: "Recherche", icon: Search },
+] as const;
+
+/** Onglets de la barre du bas sur mobile ; le reste du menu s'ouvre depuis « Plus ». */
+const TABS = [
+  { href: "/", label: "Accueil", icon: House },
   { href: "/sets", label: "Extensions", icon: Library },
+  { href: "/recherche", label: "Rechercher", icon: Search },
 ] as const;
 
 function isActive(pathname: string | null, href: string) {
@@ -76,19 +83,43 @@ export function Brand({ className }: { className?: string }) {
   );
 }
 
-export function MobileNav() {
+const tabClass = (active: boolean) =>
+  cn(
+    "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg text-[11px] font-medium text-muted-foreground transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+    active && "text-foreground",
+  );
+
+/** Barre d'onglets fixée en bas de l'écran sur mobile, au-dessus de la barre d'accueil de l'iPhone. */
+export function MobileTabBar() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger render={<Button variant="ghost" size="icon" className="lg:hidden" aria-label="Ouvrir le menu" />}>
-        <Menu />
-      </SheetTrigger>
-      <SheetContent side="left" className="w-72 bg-sidebar p-4">
-        <SheetTitle className="sr-only">Navigation</SheetTitle>
-        <Brand className="mb-4 px-1" />
-        <NavLinks pathname={pathname} onNavigate={() => setOpen(false)} />
-      </SheetContent>
-    </Sheet>
+    <nav
+      aria-label="Navigation principale"
+      className="fixed inset-x-0 bottom-0 z-40 border-t bg-sidebar/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden"
+    >
+      <div className="mx-auto grid max-w-md grid-cols-4 px-2 pt-1.5 pb-1">
+        {TABS.map(({ href, label, icon: Icon }) => {
+          const active = isActive(pathname, href);
+          return (
+            <Link key={href} href={href} aria-current={active ? "page" : undefined} className={tabClass(active)}>
+              <Icon className={cn("size-5", active && "text-primary")} />
+              {label}
+            </Link>
+          );
+        })}
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SheetTrigger render={<button type="button" className={tabClass(false)} />}>
+            <Menu className="size-5" />
+            Plus
+          </SheetTrigger>
+          <SheetContent side="left" className="w-72 bg-sidebar p-4 pt-[max(1rem,env(safe-area-inset-top))]">
+            <SheetTitle className="sr-only">Navigation</SheetTitle>
+            <Brand className="mb-4 px-1" />
+            <NavLinks pathname={pathname} onNavigate={() => setOpen(false)} />
+          </SheetContent>
+        </Sheet>
+      </div>
+    </nav>
   );
 }

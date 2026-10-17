@@ -24,6 +24,7 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Exclus : le cron (protégé par CRON_SECRET), les fichiers statiques et les images.
-  matcher: ["/((?!api/cron|_next/static|_next/image|favicon\\.ico|.*\\.(?:png|jpg|jpeg|gif|svg|webp|avif|ico|txt|xml)$).*)"],
+  // Exclus : le cron (protégé par CRON_SECRET), les fichiers statiques, les images et le manifeste
+  // (l'installation de l'app doit fonctionner depuis la page de connexion).
+  matcher: ["/((?!api/cron|_next/static|_next/image|favicon\\.ico|.*\\.(?:png|jpg|jpeg|gif|svg|webp|avif|ico|txt|xml|webmanifest)$).*)"],
 };

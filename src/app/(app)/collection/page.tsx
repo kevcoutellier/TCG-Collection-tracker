@@ -16,7 +16,7 @@ import { eur, pctText, todayISO } from "@/lib/format";
 import { loadPortfolio } from "@/lib/portfolio";
 import { refreshIfStale } from "@/lib/snapshots";
 
-export const metadata: Metadata = { title: "Ma collection" };
+export const metadata: Metadata = { title: "Portefeuille" };
 
 export default function CollectionPage() {
   return (
@@ -49,7 +49,7 @@ async function CollectionContent() {
   if (!positions.length && !sold.length) {
     return (
       <>
-        <PageHeader title="Ma collection" description="Vos cartes, cartes gradées et produits scellés, valorisés au prix du marché." />
+        <PageHeader title="Portefeuille" description="Vos cartes, cartes gradées et produits scellés, valorisés au prix du marché." />
         <EmptyState
           icon={<Layers />}
           title="Votre collection est vide"
@@ -68,7 +68,7 @@ async function CollectionContent() {
   return (
     <>
       <PageHeader
-        title="Ma collection"
+        title="Portefeuille"
         description={`${summary.itemCount} objet${summary.itemCount > 1 ? "s" : ""} en ${summary.positionCount} ligne${summary.positionCount > 1 ? "s" : ""}, valorisé${summary.itemCount > 1 ? "s" : ""} à la cote du jour.`}
         actions={actions}
       />
