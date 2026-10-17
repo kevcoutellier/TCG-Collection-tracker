@@ -15,7 +15,7 @@ import { eur } from "@/lib/format";
 import type { Lang } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-type Filter = "all" | "owned" | "missing";
+export type ChecklistFilter = "all" | "owned" | "missing";
 
 const FALLBACK_VARIANT: ChecklistVariant = { key: "normal", type: "normal", label: "Normale", price: null };
 
@@ -38,6 +38,7 @@ export function SetChecklist({
   initialItems,
   official,
   lang,
+  initialFilter = "all",
 }: {
   setId: string;
   cards: ChecklistEntry[];
@@ -45,10 +46,20 @@ export function SetChecklist({
   official: number;
   /** Langue enregistrée pour les cartes cochées depuis ce catalogue. */
   lang: Lang;
+  initialFilter?: ChecklistFilter;
 }) {
   const [rows, setRows] = useState(initialItems);
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useState<ChecklistFilter>(initialFilter);
   const [openId, setOpenId] = useState<string | null>(null);
+
+  // Next garde l'état des pages déjà visitées : en revenant sur l'extension (autre filtre demandé,
+  // collection modifiée ailleurs), on repart des données fraîches envoyées par le serveur.
+  const [synced, setSynced] = useState({ initialItems, initialFilter });
+  if (synced.initialItems !== initialItems || synced.initialFilter !== initialFilter) {
+    setSynced({ initialItems, initialFilter });
+    setRows(initialItems);
+    setFilter(initialFilter);
+  }
 
   const byCard = useMemo(() => groupByCard(rows.filter((r) => r.quantity > 0)), [rows]);
   const progress = useMemo(() => setProgress(cards, rows, official), [cards, rows, official]);

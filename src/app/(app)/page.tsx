@@ -1,299 +1,202 @@
-import {
-  ArrowRight,
-  BellRing,
-  BrainCircuit,
-  Layers,
-  LineChart,
-  Search,
-} from "lucide-react";
+import { ArrowRight, Library, Search } from "lucide-react";
 import Link from "next/link";
-import { after } from "next/server";
 import { Suspense } from "react";
 import { CardImage } from "@/components/card-image";
-import { cardHref } from "@/components/card-tile";
-import { AllocationChart, PortfolioChart } from "@/components/charts";
-import { Delta, MoneyDelta } from "@/components/delta";
-import { AddSealedDialog } from "@/components/forms/holding-forms";
-import { RefreshPricesButton } from "@/components/forms/watch-forms";
-import { MarketPulse } from "@/components/market-pulse";
-import { InsightItem } from "@/components/insight-item";
-import { PageHeader } from "@/components/page-header";
+import { cardHref, setHref } from "@/components/card-tile";
+import { InstallHint } from "@/components/install-hint";
+import { PageHeader, SectionTitle } from "@/components/page-header";
 import { Stat } from "@/components/stat";
 import { buttonVariants } from "@/components/ui/button";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { eur, pctText, todayISO } from "@/lib/format";
-import { loadPortfolio, loadPortfolioHistory, loadWatchlist, type PositionView } from "@/lib/portfolio";
-import { refreshIfStale } from "@/lib/snapshots";
+import { requireUser } from "@/lib/auth/session";
+import { getSetChecklist } from "@/lib/checklist";
+import { type CollectionItem, setProgress } from "@/lib/collection";
+import { loadRecentItems } from "@/lib/collection-db";
+import { loadCollectionOverview, type StartedSet } from "@/lib/collection-overview";
+import { eur } from "@/lib/format";
+import { getCard } from "@/lib/tcgdex";
+
+const int = new Intl.NumberFormat("fr-FR");
+
+/** Lien vers la checklist d'une extension, filtrée sur les cartes manquantes si demandé. */
+function checklistHref(set: Pick<StartedSet, "id" | "lang">, missingOnly = false) {
+  const href = setHref(set.id, set.lang);
+  return missingOnly ? `${href}${href.includes("?") ? "&" : "?"}vue=manquantes` : href;
+}
 
 export default function Home() {
   return (
-    <Suspense fallback={<DashboardSkeleton />}>
-      <Dashboard />
+    <Suspense fallback={<HomeSkeleton />}>
+      <HomeContent />
     </Suspense>
   );
 }
 
-async function Dashboard() {
-  const data = await loadPortfolio();
-  after(() => refreshIfStale().catch(() => {}));
+async function HomeContent() {
+  const user = await requireUser();
+  const [overview, recent] = await Promise.all([loadCollectionOverview(user.id), loadRecentItems(user.id, 8)]);
+  if (!overview.items.length) return <Welcome />;
 
-  if (!data.positions.length && !data.sold.length) return <Welcome today={todayISO()} />;
-
-  const [history, watch] = await Promise.all([loadPortfolioHistory(data.rows), loadWatchlist()]);
-  const { summary, insights, positions } = data;
-  const alerts = watch.filter((w) => w.reached);
-  const ranked = positions.filter((p) => p.pnlPct != null).sort((a, b) => b.pnlPct! - a.pnlPct!);
-  const winners = ranked.filter((p) => p.pnlPct! > 0).slice(0, 4);
-  const losers = ranked.filter((p) => p.pnlPct! < 0).slice(-4).reverse();
+  const { totals, sets, completed, items } = overview;
+  const inProgress = sets.filter((s) => s.owned < s.official);
+  // L'extension la plus avancée parmi celles à moitié faites : celle qu'on a envie de finir.
+  const almost = inProgress.filter((s) => s.pct >= 50).sort((a, b) => b.pct - a.pct)[0];
+  const recentCards = await Promise.all(recent.map((i) => getCard(i.cardId, i.lang === "ja" ? "ja" : "fr").catch(() => null)));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
-        eyebrow="Tableau de bord"
-        title="Votre portefeuille Pokémon"
-        description="Valorisé à la cote Cardmarket du jour. Un relevé quotidien construit l'historique de chaque carte suivie."
-        actions={<RefreshPricesButton />}
+        title="Ma collection"
+        description={`${int.format(totals.unique)} cartes différentes dans ${totals.sets} extension${totals.sets > 1 ? "s" : ""}.`}
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <Stat label="Valeur" value={eur(summary.totalValue, { compact: true })} sub={`${summary.itemCount} objets`} accent className="col-span-2 lg:col-span-1" />
-        <Stat label="Investi" value={eur(summary.totalCost, { compact: true })} />
-        <Stat label="Latent" value={<MoneyDelta value={summary.unrealized} />} sub={pctText(summary.unrealizedPct)} />
-        <Stat label="Réalisé" value={<MoneyDelta value={summary.realized} />} sub={pctText(summary.realizedPct)} />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <Stat
-          label="Diversification"
-          value={`${summary.diversification}/100`}
-          sub={summary.topName ? `1re ligne : ${Math.round(summary.topWeight * 100)} %` : undefined}
+          label="Cartes"
+          value={int.format(totals.copies)}
+          sub={`dont ${int.format(totals.doubles)} en double`}
+          accent
+          className="col-span-2 lg:col-span-1"
         />
+        <Stat label="Cartes différentes" value={int.format(totals.unique)} />
+        <Stat label="Extensions" value={sets.length} sub={`${completed} complète${completed > 1 ? "s" : ""}`} />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Évolution de la valeur</CardTitle>
-            <CardDescription>Valeur de marché vs capital investi</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {history.length >= 2 ? (
-              <PortfolioChart data={history} />
-            ) : (
-              <div className="flex h-[260px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                <LineChart className="size-6" />
-                <p className="max-w-sm text-pretty">
-                  La courbe apparaîtra dès le deuxième jour de relevés. Les prix de vos cartes sont relevés automatiquement à
-                  chaque nouvelle journée d&apos;utilisation.
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Répartition</CardTitle>
-            <CardDescription>Par type d&apos;actif</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <AllocationChart data={summary.allocation.category} height={150} />
-            <div>
-              <div className="mb-2 text-xs font-medium text-muted-foreground uppercase">Principales extensions</div>
-              <ul className="space-y-2 text-sm">
-                {summary.allocation.sets.slice(0, 4).map((s) => (
-                  <li key={s.name}>
-                    <div className="flex justify-between gap-2">
-                      <span className="truncate">{s.name}</span>
-                      <span className="num text-muted-foreground">{eur(s.value, { compact: true })}</span>
-                    </div>
-                    <div className="mt-1 h-1.5 rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full bg-chart-2"
-                        style={{ width: `${summary.totalValue ? (s.value / summary.totalValue) * 100 : 0}%` }}
-                      />
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        <MoversCard title="Meilleures performances" positions={winners} empty="Aucune ligne en plus-value pour l'instant." />
-        <MoversCard title="À surveiller" positions={losers} empty="Aucune ligne en moins-value." />
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BellRing className="size-4 text-primary" /> Alertes watchlist
-            </CardTitle>
-            <CardDescription>Cartes passées sous votre prix cible</CardDescription>
-            <CardAction>
-              <Link href="/watchlist" className="text-sm text-primary hover:underline">
-                Tout voir
-              </Link>
-            </CardAction>
-          </CardHeader>
-          <CardContent>
-            {alerts.length ? (
-              <ul className="space-y-1">
-                {alerts.slice(0, 4).map((w) => (
-                  <li key={w.id}>
-                    <Link href={cardHref(w.cardId, w.cardLang)} className="flex items-center gap-3 rounded-lg p-1.5 hover:bg-accent/50">
-                      <CardImage src={w.image} alt={w.name} className="w-8 shrink-0 rounded-[3px]" />
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium">{w.name}</div>
-                        <div className="text-xs text-muted-foreground">Cible {eur(w.targetPrice)}</div>
-                      </div>
-                      <div className="num text-sm font-medium text-gain">{eur(w.price?.price)}</div>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                {watch.length
-                  ? `Aucune des ${watch.length} cartes surveillées n'a atteint son objectif.`
-                  : "Ajoutez des cartes à surveiller avec un prix cible depuis leur fiche."}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {insights.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BrainCircuit className="size-4 text-primary" /> Diagnostic
-            </CardTitle>
-            <CardDescription>Points d&apos;attention détectés dans votre portefeuille</CardDescription>
-            <CardAction>
-              <Link href="/analyse" className="inline-flex items-center gap-1 text-sm text-primary hover:underline">
-                Analyse complète <ArrowRight className="size-3.5" />
-              </Link>
-            </CardAction>
-          </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-2">
-            {insights.slice(0, 4).map((i) => (
-              <InsightItem key={i.title} insight={i} />
-            ))}
-          </CardContent>
-        </Card>
+      {almost && (
+        <Suspense fallback={<Skeleton className="h-36 rounded-xl" />}>
+          <AlmostDone set={almost} items={items} />
+        </Suspense>
       )}
 
-      <Suspense fallback={<Skeleton className="h-64 rounded-xl" />}>
-        <MarketPulse />
-      </Suspense>
+      {inProgress.length > 0 && (
+        <section>
+          <SectionTitle
+            action={
+              <Link href="/sets" className="text-sm text-primary hover:underline">
+                Toutes les extensions
+              </Link>
+            }
+          >
+            Continuer
+          </SectionTitle>
+          <ul className="grid gap-2 md:grid-cols-2">
+            {inProgress.slice(0, 6).map((set) => (
+              <li key={set.id}>
+                <SetRow set={set} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {recentCards.some(Boolean) && (
+        <section>
+          <SectionTitle>Ajoutées récemment</SectionTitle>
+          <ul className="grid grid-cols-4 gap-2.5 sm:grid-cols-6 lg:grid-cols-8">
+            {recentCards.map((card, i) =>
+              card ? (
+                <li key={`${recent[i].cardId}:${recent[i].variant}:${recent[i].lang}`} className="min-w-0">
+                  <Link href={cardHref(card.id, recent[i].lang === "ja" ? "ja" : "fr")} className="block space-y-1">
+                    <CardImage src={card.image} alt="" />
+                    <span className="block truncate text-xs font-medium">{card.name}</span>
+                  </Link>
+                </li>
+              ) : null,
+            )}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }
 
-function MoversCard({ title, positions, empty }: { title: string; positions: PositionView[]; empty: string }) {
+function SetRow({ set }: { set: StartedSet }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>Plus-value latente en %</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {positions.length ? (
-          <ul className="space-y-1">
-            {positions.map((p) => (
-              <li key={p.id} className="flex items-center gap-3 rounded-lg p-1.5">
-                <CardImage src={p.image} alt={p.name} className="w-8 shrink-0 rounded-[3px]" />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium">{p.name}</div>
-                  <div className="truncate text-xs text-muted-foreground">{p.setName}</div>
-                </div>
-                <div className="text-right">
-                  <Delta value={p.pnlPct} className="text-sm" />
-                  <div className="text-xs">
-                    <MoneyDelta value={p.pnl} />
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+    <Link href={checklistHref(set)} className="flex items-center gap-3 rounded-xl border bg-card p-3 transition-colors hover:border-primary/40 hover:bg-accent/40">
+      <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-muted">
+        {set.symbol || set.logo ? (
+          // eslint-disable-next-line @next/next/no-img-element -- symbole distant TCGdex
+          <img src={`${set.symbol ?? set.logo}.webp`} alt="" className="max-h-7 max-w-8 object-contain" loading="lazy" />
         ) : (
-          <p className="text-sm text-muted-foreground">{empty}</p>
+          <Library className="size-5 text-muted-foreground" />
         )}
-      </CardContent>
-    </Card>
+      </span>
+      <span className="min-w-0 flex-1 space-y-1.5">
+        <span className="flex items-baseline justify-between gap-2">
+          <span className="truncate font-medium">{set.name}</span>
+          <span className="num shrink-0 text-sm text-muted-foreground">
+            {set.owned} / {set.official}
+          </span>
+        </span>
+        <span className="block h-1.5 overflow-hidden rounded-full bg-muted">
+          <span className="block h-full rounded-full bg-primary" style={{ width: `${set.pct}%` }} />
+        </span>
+      </span>
+    </Link>
   );
 }
 
-const FEATURES = [
-  {
-    icon: Search,
-    title: "Cotes en temps réel",
-    text: "Plus de 20 000 cartes avec les prix Cardmarket (tendance, moyennes 1/7/30 j) et TCGplayer.",
-  },
-  {
-    icon: Layers,
-    title: "Collection = portefeuille",
-    text: "Cartes brutes, gradées et scellé : prix de revient, valeur, plus-values latentes et réalisées.",
-  },
-  {
-    icon: BrainCircuit,
-    title: "Analyse & stratégie",
-    text: "Score d'attractivité, signaux de momentum, diagnostic de diversification, simulateurs de grading et de revente.",
-  },
-];
-
-function Welcome({ today }: { today: string }) {
+/** Encart « presque fini » : cartes manquantes et leur coût, calculés sur la checklist complète. */
+async function AlmostDone({ set, items }: { set: StartedSet; items: CollectionItem[] }) {
+  const checklist = await getSetChecklist(set.id, set.lang).catch(() => null);
+  const progress = checklist ? setProgress(checklist.cards, items.filter((i) => i.setId === set.id), set.official) : null;
+  const missing = progress?.missing ?? set.official - set.owned;
   return (
-    <div className="space-y-8">
-      <section className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/15 via-card to-card p-6 sm:p-10">
+    <section className="flex flex-col gap-3 rounded-xl border border-primary/40 bg-gradient-to-br from-primary/15 via-card to-card p-5 sm:flex-row sm:items-center">
+      <div className="min-w-0 flex-1">
+        <div className="text-xs font-semibold tracking-widest text-primary uppercase">Presque fini · {set.pct} %</div>
+        <h2 className="mt-1 text-lg font-semibold text-balance">
+          Plus que {missing} carte{missing > 1 ? "s" : ""} pour finir {set.name}
+        </h2>
+        {progress?.missingCost != null && (
+          <p className="mt-0.5 text-sm text-muted-foreground">Environ {eur(progress.missingCost, { compact: true })} à la cote du jour</p>
+        )}
+      </div>
+      <Link href={checklistHref(set, true)} className={buttonVariants({ size: "lg", className: "self-start sm:self-center" })}>
+        Voir les cartes manquantes <ArrowRight />
+      </Link>
+    </section>
+  );
+}
+
+function Welcome() {
+  return (
+    <div className="space-y-6">
+      <section className="rounded-2xl border bg-gradient-to-br from-primary/15 via-card to-card p-6 sm:p-10">
         <div className="max-w-2xl">
-          <div className="text-xs font-semibold tracking-widest text-primary uppercase">Collection & investissement</div>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-            Pilotez votre collection Pokémon comme un portefeuille.
-          </h1>
+          <div className="text-xs font-semibold tracking-widest text-primary uppercase">Bienvenue</div>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">Votre collection, extension par extension.</h1>
           <p className="mt-3 text-muted-foreground text-pretty">
-            Recherchez n&apos;importe quelle carte, suivez l&apos;évolution de sa cote, enregistrez vos achats et laissez
-            l&apos;analyse repérer les risques et les opportunités.
+            Ouvrez une extension et touchez les cartes que vous possédez : PokéFolio suit votre avancement, liste les cartes
+            manquantes et indique ce qu&apos;elles coûtent à la cote du jour.
           </p>
           <div className="mt-6 flex flex-wrap gap-2">
-            <Link href="/recherche" className={buttonVariants({ size: "lg" })}>
-              <Search />
-              Ajouter ma première carte
+            <Link href="/sets" className={buttonVariants({ size: "lg" })}>
+              <Library />
+              Choisir une extension
             </Link>
-            <AddSealedDialog today={today} />
-            <Link href="/marche" className={buttonVariants({ variant: "ghost", size: "lg" })}>
-              Explorer le marché <ArrowRight />
+            <Link href="/recherche" className={buttonVariants({ variant: "ghost", size: "lg" })}>
+              <Search />
+              Rechercher une carte
             </Link>
           </div>
         </div>
       </section>
-      <div className="grid gap-4 md:grid-cols-3">
-        {FEATURES.map(({ icon: Icon, title, text }) => (
-          <div key={title} className="rounded-xl border bg-card p-5">
-            <Icon className="size-5 text-primary" />
-            <h2 className="mt-3 font-medium">{title}</h2>
-            <p className="mt-1 text-sm text-muted-foreground text-pretty">{text}</p>
-          </div>
-        ))}
-      </div>
-      <Suspense fallback={<Skeleton className="h-64 rounded-xl" />}>
-        <MarketPulse />
-      </Suspense>
+      <InstallHint />
     </div>
   );
 }
 
-function DashboardSkeleton() {
+function HomeSkeleton() {
   return (
     <div className="space-y-6">
-      <Skeleton className="h-9 w-72" />
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        {Array.from({ length: 5 }, (_, i) => (
-          <Skeleton key={i} className="h-24 rounded-xl" />
-        ))}
+      <Skeleton className="h-9 w-56" />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <Skeleton className="col-span-2 h-24 rounded-xl lg:col-span-1" />
+        <Skeleton className="h-24 rounded-xl" />
+        <Skeleton className="h-24 rounded-xl" />
       </div>
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Skeleton className="h-80 rounded-xl lg:col-span-2" />
-        <Skeleton className="h-80 rounded-xl" />
-      </div>
+      <Skeleton className="h-48 rounded-xl" />
     </div>
   );
 }

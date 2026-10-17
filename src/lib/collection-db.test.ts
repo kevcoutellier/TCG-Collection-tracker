@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { importHoldingsOnce, loadSetItems, ownedCardIdsBySet, setItemQuantity } from "./collection-db";
+import { importHoldingsOnce, loadRecentItems, loadSetItems, ownedCardsBySet, setItemQuantity } from "./collection-db";
 import { getDb, schema } from "./db";
 
 // Base PGlite jetable : le SQL de reprise et d'upsert est exécuté pour de vrai.
@@ -57,9 +57,12 @@ describe("collection en base", () => {
     expect((await loadSetItems(userId, "sv03.5")).map((i) => i.cardId)).toEqual(["sv03.5-006"]);
   });
 
-  it("compte les cartes différentes par extension", async () => {
+  it("regroupe les cartes par extension, la plus récemment modifiée en tête", async () => {
     await setItemQuantity(userId, { cardId: "sv03.5-006", lang: "fr", setId: "sv03.5", variant: "reverse", quantity: 1 });
     await setItemQuantity(userId, { cardId: "sv01-001", lang: "fr", setId: "sv01", variant: "normal", quantity: 1 });
-    expect(Object.fromEntries(await ownedCardIdsBySet(userId))).toEqual({ "sv03.5": ["sv03.5-006"], sv01: ["sv01-001"] });
+    const sets = await ownedCardsBySet(userId);
+    expect([...sets.keys()]).toEqual(["sv01", "sv03.5"]);
+    expect(sets.get("sv03.5")?.cardIds).toEqual(["sv03.5-006"]);
+    expect((await loadRecentItems(userId, 2)).map((i) => `${i.cardId}:${i.variant}`)).toEqual(["sv01-001:normal", "sv03.5-006:reverse"]);
   });
 });

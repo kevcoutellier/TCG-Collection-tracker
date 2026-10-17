@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { requireUser } from "@/lib/auth/session";
 import { countOfficial } from "@/lib/collection";
-import { ownedCardIdsBySet } from "@/lib/collection-db";
+import { type OwnedSet, ownedCardsBySet } from "@/lib/collection-db";
 import { dateText } from "@/lib/format";
 import { getJapaneseSets, type JapaneseSet } from "@/lib/japan";
 import { getSeriesWithSets } from "@/lib/tcgdex";
@@ -62,8 +62,8 @@ async function SetsContent({ searchParams }: Pick<PageProps<"/sets">, "searchPar
 }
 
 /** Avancement d'une extension pour sa vignette : cartes officielles possédées, secrètes à part. */
-function tileProgress(owned: Map<string, string[]>, set: { id: string; cardCount: { official: number; total: number } }) {
-  const ids = owned.get(set.id);
+function tileProgress(owned: Map<string, OwnedSet>, set: { id: string; cardCount: { official: number; total: number } }) {
+  const ids = owned.get(set.id)?.cardIds;
   if (!ids?.length) return undefined;
   const official = set.cardCount.official || set.cardCount.total;
   return { owned: countOfficial(ids, official, set.cardCount.total), official };
@@ -125,7 +125,7 @@ function SetTile({
 async function SetsList() {
   await connection();
   const [series, user] = await Promise.all([getSeriesWithSets("fr"), requireUser()]);
-  const owned = await ownedCardIdsBySet(user.id);
+  const owned = await ownedCardsBySet(user.id);
   return (
     <div className="space-y-10">
       <nav className="flex flex-wrap gap-2" aria-label="Séries">
@@ -163,7 +163,7 @@ async function SetsList() {
 async function JapaneseSetsList() {
   await connection();
   const [sets, user] = await Promise.all([getJapaneseSets(), requireUser()]);
-  const owned = await ownedCardIdsBySet(user.id);
+  const owned = await ownedCardsBySet(user.id);
   const groups: { id: string; label: string; sets: JapaneseSet[] }[] = [];
   for (const s of sets) {
     let g = groups.find((x) => x.id === s.serieId);

@@ -60,3 +60,25 @@ export async function getSetChecklist(id: string, lang: Lang): Promise<SetCheckl
   const { name, logo, symbol, cardCount, releaseDate, serie } = set;
   return { set: { id: set.id, name, logo, symbol, cardCount, releaseDate, serie }, englishName, cards };
 }
+
+export interface SetInfo {
+  id: string;
+  name: string;
+  logo: string | null;
+  symbol: string | null;
+  official: number;
+  total: number;
+  /** Catalogue où l'extension a été trouvée : international (« fr ») ou japonais. */
+  lang: "fr" | "ja";
+}
+
+/** Fiche courte d'une extension à partir de son seul ID : catalogue international d'abord, japonais sinon. */
+export async function getSetInfo(id: string): Promise<SetInfo | null> {
+  for (const lang of ["fr", "ja"] as const) {
+    const set = await getSet(id, lang).catch(() => null);
+    if (!set) continue;
+    const { official, total } = set.cardCount;
+    return { id: set.id, name: set.name, logo: set.logo ?? null, symbol: set.symbol ?? null, official: official || total, total, lang };
+  }
+  return null;
+}

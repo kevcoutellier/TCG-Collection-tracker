@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { SetChecklist } from "@/components/checklist/set-checklist";
+import { type ChecklistFilter, SetChecklist } from "@/components/checklist/set-checklist";
 import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { requireUser } from "@/lib/auth/session";
@@ -24,6 +24,9 @@ export default function SetPage({ params, searchParams }: PageProps<"/sets/[id]"
 function first(v: string | string[] | undefined) {
   return (Array.isArray(v) ? v[0] : v) ?? "";
 }
+
+/** `?vue=manquantes` ou `?vue=possedees` : ouvre la checklist déjà filtrée (lien « cartes manquantes » de l'accueil). */
+const VIEWS: Record<string, ChecklistFilter> = { manquantes: "missing", possedees: "owned" };
 
 async function SetContent({ params, searchParams }: Pick<PageProps<"/sets/[id]">, "params" | "searchParams">) {
   const [{ id: rawId }, sp] = await Promise.all([params, searchParams]);
@@ -56,7 +59,14 @@ async function SetContent({ params, searchParams }: Pick<PageProps<"/sets/[id]">
           ) : undefined
         }
       />
-      <SetChecklist setId={set.id} cards={cards} initialItems={items} official={official} lang={lang} />
+      <SetChecklist
+        setId={set.id}
+        cards={cards}
+        initialItems={items}
+        official={official}
+        lang={lang}
+        initialFilter={VIEWS[first(sp.vue)] ?? "all"}
+      />
     </>
   );
 }

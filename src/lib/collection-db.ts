@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, max, sql } from "drizzle-orm";
 import type { CollectionItem } from "./collection";
 import { getDb, schema } from "./db";
 
@@ -54,18 +54,40 @@ export async function loadCollectionItems(userId: string): Promise<CollectionIte
   return db.select(columns).from(t).where(eq(t.userId, userId));
 }
 
-/** Cartes différentes possédées, par extension (toutes langues et variantes confondues). */
-export async function ownedCardIdsBySet(userId: string): Promise<Map<string, string[]>> {
+export interface OwnedSet {
+  /** Cartes différentes possédées (toutes langues et variantes confondues). */
+  cardIds: string[];
+  /** Dernière modification d'une de ses cartes : les extensions « en cours » se trient dessus. */
+  lastUpdate: Date;
+}
+
+/** Extensions commencées, de la plus récemment modifiée à la plus ancienne. */
+export async function ownedCardsBySet(userId: string): Promise<Map<string, OwnedSet>> {
   await importHoldingsOnce(userId);
   const db = await getDb();
-  const rows = await db.selectDistinct({ setId: t.setId, cardId: t.cardId }).from(t).where(eq(t.userId, userId));
-  const out = new Map<string, string[]>();
-  for (const { setId, cardId } of rows) {
-    const list = out.get(setId);
-    if (list) list.push(cardId);
-    else out.set(setId, [cardId]);
+  const rows = await db
+    .select({ setId: t.setId, cardId: t.cardId, lastUpdate: max(t.updatedAt) })
+    .from(t)
+    .where(eq(t.userId, userId))
+    .groupBy(t.setId, t.cardId);
+  const out = new Map<string, OwnedSet>();
+  for (const { setId, cardId, lastUpdate } of rows) {
+    const at = lastUpdate ?? new Date(0);
+    const set = out.get(setId);
+    if (!set) out.set(setId, { cardIds: [cardId], lastUpdate: at });
+    else {
+      set.cardIds.push(cardId);
+      if (at > set.lastUpdate) set.lastUpdate = at;
+    }
   }
-  return out;
+  return new Map([...out].sort(([, a], [, b]) => b.lastUpdate.getTime() - a.lastUpdate.getTime()));
+}
+
+/** Dernières cartes ajoutées ou modifiées. */
+export async function loadRecentItems(userId: string, limit: number): Promise<CollectionItem[]> {
+  await importHoldingsOnce(userId);
+  const db = await getDb();
+  return db.select(columns).from(t).where(eq(t.userId, userId)).orderBy(desc(t.updatedAt)).limit(limit);
 }
 
 /** Fixe la quantité possédée d'une carte × langue × variante ; à 0, la ligne est supprimée. */
@@ -83,6 +105,6 @@ export async function setItemQuantity(userId: string, item: CollectionItem): Pro
     .values({ userId, cardId: item.cardId, cardLang: item.lang, variant: item.variant, setId: item.setId, quantity: item.quantity })
     .onConflictDoUpdate({
       target: [t.userId, t.cardId, t.cardLang, t.variant],
-      set: { quantity: item.quantity, setId: item.setId, updatedAt: new Date() },
+      set: { quantity: item.quantity, setId: item.setId, updatedAt: sql`now()` },
     });
 }
