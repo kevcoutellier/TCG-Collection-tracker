@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { PokeballGate } from "@/components/gate/pokeball-gate";
+import { ServiceWorkerRegistration } from "@/components/offline";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <style>{".pg-root{display:none}"}</style>
         </noscript>
         <PokeballGate />
+        <ServiceWorkerRegistration />
         <TooltipProvider>
           {children}
           <Toaster

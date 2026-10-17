@@ -4,6 +4,7 @@ import { Search } from "lucide-react";
 import { Suspense } from "react";
 import { ActiveNavLinks, Brand, MobileTabBar, NavLinks } from "@/components/app-nav";
 import { ReplayGateButton } from "@/components/gate/pokeball-gate";
+import { OfflineBanner } from "@/components/offline";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserMenu } from "@/components/user-menu";
@@ -51,6 +52,7 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
       <Suspense>
         <MobileTabBar />
       </Suspense>
+      <OfflineBanner />
     </div>
   );
 }

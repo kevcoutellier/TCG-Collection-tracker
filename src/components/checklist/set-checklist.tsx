@@ -73,7 +73,10 @@ export function SetChecklist({
     const previous = rows.find(same);
     setRows((list) => [...list.filter((r) => !same(r)), ...(next.quantity > 0 ? [next] : [])]);
     startTransition(async () => {
-      const res = await setCardQuantity({ cardId: next.cardId, lang: next.lang, variant: next.variant, quantity: next.quantity });
+      // Hors ligne, l'appel attend le retour du réseau (experimental.useOffline) : l'écran garde la modification.
+      const res = await setCardQuantity({ cardId: next.cardId, lang: next.lang, variant: next.variant, quantity: next.quantity }).catch(
+        () => ({ ok: false, message: "Enregistrement impossible, réessayez." }),
+      );
       if (res.ok) return;
       setRows((list) => [...list.filter((r) => !same(r)), ...(previous ? [previous] : [])]);
       toast.error(res.message);
