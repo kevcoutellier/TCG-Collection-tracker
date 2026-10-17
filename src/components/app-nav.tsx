@@ -67,7 +67,7 @@ export function MobileTabBar() {
       aria-label="Navigation principale"
       className="fixed inset-x-0 bottom-0 z-40 border-t bg-sidebar/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden"
     >
-      <div className="mx-auto grid max-w-md grid-cols-4 px-2 pt-1.5 pb-1">
+      <div className="mx-auto grid max-w-lg grid-cols-5 px-1 pt-1.5 pb-1">
         {COLLECTION_NAV.map(({ href, label, icon: Icon }) => {
           const active = isActive(pathname, href);
           return (

@@ -152,3 +152,37 @@ export function collectionTotals(items: readonly CollectionItem[]): CollectionTo
   }
   return { copies, unique: cards.size, doubles, sets: sets.size };
 }
+
+/** Carte qu'un collectionneur peut céder : un de ses doubles, avec le nombre d'exemplaires en trop. */
+export interface TradeCard {
+  cardId: string;
+  setId: string;
+  lang: Lang;
+  variant: VariantKey;
+  spare: number;
+}
+
+/**
+ * Doubles de `giver` qui manquent à `taker`, limités aux extensions que `taker` a commencées (un double
+ * d'une extension qu'il ne collectionne pas ne l'intéresse pas). Une entrée par carte : la variante la plus
+ * abondante, triées par extension puis numéro.
+ */
+export function tradeMatches(giver: readonly CollectionItem[], taker: readonly CollectionItem[]): TradeCard[] {
+  const owned = new Set<string>();
+  const started = new Set<string>();
+  for (const item of taker) {
+    if (item.quantity <= 0) continue;
+    owned.add(item.cardId);
+    started.add(item.setId);
+  }
+  const best = new Map<string, TradeCard>();
+  for (const item of giver) {
+    const spare = item.quantity - 1;
+    if (spare <= 0 || owned.has(item.cardId) || !started.has(item.setId)) continue;
+    const current = best.get(item.cardId);
+    if (!current || spare > current.spare) {
+      best.set(item.cardId, { cardId: item.cardId, setId: item.setId, lang: item.lang, variant: item.variant, spare });
+    }
+  }
+  return [...best.values()].sort((a, b) => a.cardId.localeCompare(b.cardId, "fr", { numeric: true }));
+}

@@ -115,6 +115,24 @@ export const collectionItems = pgTable(
   ],
 );
 
+/**
+ * Amis : une ligne par « `userId` a ajouté `friendId` ». Les collections ne se comparent qu'entre amis
+ * mutuels (les deux lignes existent) : personne ne voit la collection d'un compte sans son accord.
+ */
+export const friendships = pgTable(
+  "friendships",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    friendId: uuid("friend_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.friendId] }), index("friendships_friend_idx").on(t.friendId)],
+);
+
 /** Un relevé de prix par jour et par objet suivi : c'est ce qui construit l'historique. */
 export const priceSnapshots = pgTable(
   "price_snapshots",
@@ -238,4 +256,14 @@ CREATE TABLE IF NOT EXISTS collection_items (
   PRIMARY KEY (user_id, card_id, card_lang, variant)
 );
 CREATE INDEX IF NOT EXISTS collection_items_user_set_idx ON collection_items (user_id, set_id);
+
+-- v5 : amis, pour comparer doubles et cartes manquantes (uniquement entre amis mutuels)
+CREATE TABLE IF NOT EXISTS friendships (
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  friend_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, friend_id),
+  CHECK (user_id <> friend_id)
+);
+CREATE INDEX IF NOT EXISTS friendships_friend_idx ON friendships (friend_id);
 `;

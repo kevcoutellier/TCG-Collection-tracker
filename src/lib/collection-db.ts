@@ -38,20 +38,21 @@ export async function importHoldingsOnce(userId: string): Promise<void> {
   imported.add(userId);
 }
 
-const columns = { cardId: t.cardId, lang: t.cardLang, setId: t.setId, variant: t.variant, quantity: t.quantity };
+/** Colonnes d'une ligne de collection, au format `CollectionItem`. */
+export const itemColumns = { cardId: t.cardId, lang: t.cardLang, setId: t.setId, variant: t.variant, quantity: t.quantity };
 
 /** Lignes de collection d'une extension. */
 export async function loadSetItems(userId: string, setId: string): Promise<CollectionItem[]> {
   await importHoldingsOnce(userId);
   const db = await getDb();
-  return db.select(columns).from(t).where(and(eq(t.userId, userId), eq(t.setId, setId)));
+  return db.select(itemColumns).from(t).where(and(eq(t.userId, userId), eq(t.setId, setId)));
 }
 
 /** Toute la collection du compte. */
 export async function loadCollectionItems(userId: string): Promise<CollectionItem[]> {
   await importHoldingsOnce(userId);
   const db = await getDb();
-  return db.select(columns).from(t).where(eq(t.userId, userId));
+  return db.select(itemColumns).from(t).where(eq(t.userId, userId));
 }
 
 export interface OwnedSet {
@@ -87,7 +88,7 @@ export async function ownedCardsBySet(userId: string): Promise<Map<string, Owned
 export async function loadRecentItems(userId: string, limit: number): Promise<CollectionItem[]> {
   await importHoldingsOnce(userId);
   const db = await getDb();
-  return db.select(columns).from(t).where(eq(t.userId, userId)).orderBy(desc(t.updatedAt)).limit(limit);
+  return db.select(itemColumns).from(t).where(eq(t.userId, userId)).orderBy(desc(t.updatedAt)).limit(limit);
 }
 
 /** Fixe la quantité possédée d'une carte × langue × variante ; à 0, la ligne est supprimée. */

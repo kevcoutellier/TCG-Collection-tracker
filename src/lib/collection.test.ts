@@ -10,6 +10,7 @@ import {
   resolveVariantKey,
   setIdFromCardId,
   setProgress,
+  tradeMatches,
 } from "./collection";
 
 const normal = (price: number | null = 1) => ({ key: "normal", type: "normal", price });
@@ -100,5 +101,29 @@ describe("totaux de la collection", () => {
   it("distingue exemplaires, cartes uniques et doubles", () => {
     const t = collectionTotals([item("001", "normal", 3), item("001", "reverse"), item("002", "normal", 0), item("006", "normal", 2, "en")]);
     expect(t).toEqual({ copies: 6, unique: 2, doubles: 3, sets: 1 });
+  });
+});
+
+describe("échanges", () => {
+  const lea: CollectionItem[] = [
+    item("001", "normal", 3),
+    item("001", "reverse", 2),
+    item("002", "normal", 2),
+    item("003", "normal", 2),
+    item("004", "normal", 1),
+    { cardId: "sv01-010", lang: "fr", setId: "sv01", variant: "normal", quantity: 4 },
+  ];
+  const sacha: CollectionItem[] = [item("003", "reverse"), item("005"), item("002", "normal", 0)];
+
+  it("propose les doubles qui manquent, dans les extensions commencées seulement", () => {
+    expect(tradeMatches(lea, sacha)).toEqual([
+      { cardId: "sv03.5-001", setId: "sv03.5", lang: "fr", variant: "normal", spare: 2 },
+      { cardId: "sv03.5-002", setId: "sv03.5", lang: "fr", variant: "normal", spare: 1 },
+    ]);
+  });
+
+  it("rien à proposer sans doubles ou sans extension en commun", () => {
+    expect(tradeMatches(sacha, lea)).toEqual([]);
+    expect(tradeMatches(lea, [])).toEqual([]);
   });
 });

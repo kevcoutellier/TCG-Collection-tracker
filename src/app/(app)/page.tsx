@@ -1,4 +1,4 @@
-import { ArrowRight, Library, Search } from "lucide-react";
+import { ArrowLeftRight, ArrowRight, ChevronRight, Library, Search } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 import { CardImage } from "@/components/card-image";
@@ -14,6 +14,7 @@ import { type CollectionItem, setProgress } from "@/lib/collection";
 import { loadRecentItems } from "@/lib/collection-db";
 import { loadCollectionOverview, type StartedSet } from "@/lib/collection-overview";
 import { eur } from "@/lib/format";
+import { loadTrades } from "@/lib/friends-db";
 import { getCard } from "@/lib/tcgdex";
 
 const int = new Intl.NumberFormat("fr-FR");
@@ -67,6 +68,10 @@ async function HomeContent() {
           <AlmostDone set={almost} items={items} />
         </Suspense>
       )}
+
+      <Suspense>
+        <FriendsTeaser userId={user.id} />
+      </Suspense>
 
       {inProgress.length > 0 && (
         <section>
@@ -156,6 +161,30 @@ async function AlmostDone({ set, items }: { set: StartedSet; items: CollectionIt
         Voir les cartes manquantes <ArrowRight />
       </Link>
     </section>
+  );
+}
+
+/** Rappel des échanges : l'ami qui a le plus de doubles qui vous manquent. */
+async function FriendsTeaser({ userId }: { userId: string }) {
+  const { trades } = await loadTrades(userId);
+  const best = trades.filter((t) => t.forMe.length).sort((a, b) => b.forMe.length - a.forMe.length)[0];
+  if (!best) return null;
+  const n = best.forMe.length;
+  return (
+    <Link href="/echanges" className="flex items-center gap-3 rounded-xl border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-accent/40">
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+        <ArrowLeftRight className="size-5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-medium">
+          {best.friend.username} a {n} carte{n > 1 ? "s" : ""} qui vous manque{n > 1 ? "nt" : ""}
+        </span>
+        <span className="block text-sm text-muted-foreground">
+          et il lui en manque {best.forThem.length} que vous avez en double
+        </span>
+      </span>
+      <ChevronRight className="size-4 text-muted-foreground" />
+    </Link>
   );
 }
 

@@ -1,4 +1,4 @@
-import { BrainCircuit, Eye, House, Layers, LayoutDashboard, Library, Search, TrendingUp, UserRound } from "lucide-react";
+import { ArrowLeftRight, BrainCircuit, Eye, House, Layers, LayoutDashboard, Library, Search, TrendingUp, UserRound } from "lucide-react";
 
 // Entrées de navigation, partagées par la barre latérale, la barre d'onglets mobile et la page Profil.
 // Module sans « use client » : un composant serveur peut le lire.
@@ -7,6 +7,7 @@ export const COLLECTION_NAV = [
   { href: "/", label: "Accueil", icon: House },
   { href: "/sets", label: "Extensions", icon: Library },
   { href: "/recherche", label: "Rechercher", icon: Search },
+  { href: "/echanges", label: "Échanges", icon: ArrowLeftRight },
   { href: "/profil", label: "Profil", icon: UserRound },
 ] as const;
 
