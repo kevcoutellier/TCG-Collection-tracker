@@ -62,3 +62,16 @@ export function PokeballIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+/** Poké Ball pleine (logo) : moitié haute rouge, moitié basse blanche, bande et bouton sombres. */
+export function PokeballMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 32 32" className={className} aria-hidden>
+      <circle cx="16" cy="16" r="14.5" fill="#fff" />
+      <path d="M1.5 16a14.5 14.5 0 0 1 29 0z" className="fill-primary" />
+      <path d="M1.5 16h29" className="stroke-foreground" strokeWidth="3" />
+      <circle cx="16" cy="16" r="14.5" fill="none" className="stroke-foreground" strokeWidth="2.2" />
+      <circle cx="16" cy="16" r="4.6" fill="#fff" className="stroke-foreground" strokeWidth="2.4" />
+    </svg>
+  );
+}

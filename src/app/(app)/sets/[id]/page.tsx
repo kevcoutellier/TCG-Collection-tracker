@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { type ChecklistFilter, SetChecklist } from "@/components/checklist/set-checklist";
-import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { requireUser } from "@/lib/auth/session";
 import { getSetChecklist } from "@/lib/checklist";
@@ -43,22 +42,24 @@ async function SetContent({ params, searchParams }: Pick<PageProps<"/sets/[id]">
 
   return (
     <>
-      <PageHeader
-        eyebrow={lang === "ja" ? `Japon · ${JA_SERIES_LABELS[set.serie.id] ?? set.serie.name}` : set.serie.name}
-        title={englishName ?? set.name}
-        description={
-          <>
+      <header className="flex items-center gap-4 pb-5 sm:gap-6">
+        {set.logo && (
+          <div className="flex h-20 w-28 shrink-0 items-center justify-center rounded-xl border bg-card p-2 shadow-sm sm:h-24 sm:w-44">
+            {/* eslint-disable-next-line @next/next/no-img-element -- logo distant TCGdex */}
+            <img src={`${set.logo}.webp`} alt="" className="max-h-full max-w-full object-contain" />
+          </div>
+        )}
+        <div className="min-w-0">
+          <div className="text-xs font-semibold tracking-widest text-primary uppercase">
+            {lang === "ja" ? `Japon · ${JA_SERIES_LABELS[set.serie.id] ?? set.serie.name}` : set.serie.name}
+          </div>
+          <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-balance sm:text-3xl">{englishName ?? set.name}</h1>
+          <p className="mt-1 text-sm text-muted-foreground text-pretty">
             {englishName && <span className="mr-1 text-foreground">{set.name} ·</span>}
             Sortie le {dateText(set.releaseDate)} · {official} cartes{secret ? ` + ${secret} secrètes` : ""}
-          </>
-        }
-        actions={
-          set.logo ? (
-            // eslint-disable-next-line @next/next/no-img-element -- logo distant TCGdex
-            <img src={`${set.logo}.webp`} alt="" className="h-14 max-w-48 object-contain sm:h-16" />
-          ) : undefined
-        }
-      />
+          </p>
+        </div>
+      </header>
       <SetChecklist
         setId={set.id}
         cards={cards}

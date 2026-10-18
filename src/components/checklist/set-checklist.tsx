@@ -27,6 +27,38 @@ function variantBadge(v: ChecklistVariant): string {
   return v.type === "reverse" ? "R" : v.type === "holo" ? "H" : "N";
 }
 
+/** Anneau de progression des cartes officielles possédées, pourcentage au centre. */
+function ProgressRing({ value, max, pct }: { value: number; max: number; pct: number }) {
+  const r = 34;
+  const circumference = 2 * Math.PI * r;
+  return (
+    <div
+      role="progressbar"
+      aria-label="Cartes officielles possédées"
+      aria-valuemin={0}
+      aria-valuemax={max}
+      aria-valuenow={value}
+      className="relative size-20 shrink-0 sm:size-24"
+    >
+      <svg viewBox="0 0 80 80" className="size-full -rotate-90" aria-hidden>
+        <circle cx="40" cy="40" r={r} fill="none" strokeWidth="8" className="stroke-muted" />
+        <circle
+          cx="40"
+          cy="40"
+          r={r}
+          fill="none"
+          strokeWidth="8"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference * (1 - pct / 100)}
+          className={cn("transition-[stroke-dashoffset] duration-500", pct === 100 ? "stroke-gold" : "stroke-primary")}
+        />
+      </svg>
+      <span className="num absolute inset-0 flex items-center justify-center text-lg font-bold sm:text-xl">{pct} %</span>
+    </div>
+  );
+}
+
 /**
  * Checklist d'une extension, façon classeur : toucher une carte la coche (variante principale) ou la décoche.
  * Une carte en plusieurs exemplaires ou variantes ouvre le détail, pour ne rien retirer par mégarde.
@@ -105,39 +137,31 @@ export function SetChecklist({
 
   return (
     <div className="space-y-5">
-      <section className="rounded-xl border bg-card p-4 sm:p-5" aria-label="Avancement">
-        <div className="flex items-baseline justify-between gap-3">
-          <div className="num">
-            <span className="text-3xl font-semibold tracking-tight">{progress.owned}</span>
-            <span className="text-muted-foreground"> / {official} cartes</span>
+      <section className="rounded-2xl border bg-card p-4 shadow-sm sm:p-5" aria-label="Avancement">
+        <div className="flex items-center gap-4 sm:gap-5">
+          <ProgressRing value={progress.owned} max={official} pct={pct} />
+          <div className="min-w-0 flex-1">
+            <div className="num">
+              <span className="text-3xl font-bold tracking-tight">{progress.owned}</span>
+              <span className="text-muted-foreground"> / {official} cartes</span>
+            </div>
+            <dl className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-sm">
+              <div className="flex gap-1.5">
+                <dt className="text-muted-foreground">Secrètes incluses</dt>
+                <dd className="num font-semibold">
+                  {progress.ownedAll} / {progress.total}
+                </dd>
+              </div>
+              <div className="flex gap-1.5">
+                <dt className="text-muted-foreground">Master set</dt>
+                <dd className="num font-semibold">
+                  {progress.masterOwned} / {progress.masterTotal}
+                </dd>
+              </div>
+            </dl>
           </div>
-          <div className="num text-lg font-semibold">{pct} %</div>
         </div>
-        <div
-          role="progressbar"
-          aria-label="Cartes officielles possédées"
-          aria-valuemin={0}
-          aria-valuemax={official}
-          aria-valuenow={progress.owned}
-          className="mt-3 h-2 overflow-hidden rounded-full bg-muted"
-        >
-          <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${pct}%` }} />
-        </div>
-        <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm">
-          <div className="flex gap-1.5">
-            <dt className="text-muted-foreground">Secrètes incluses</dt>
-            <dd className="num font-medium">
-              {progress.ownedAll} / {progress.total}
-            </dd>
-          </div>
-          <div className="flex gap-1.5">
-            <dt className="text-muted-foreground">Master set</dt>
-            <dd className="num font-medium">
-              {progress.masterOwned} / {progress.masterTotal}
-            </dd>
-          </div>
-        </dl>
-        <p className="mt-3 rounded-lg bg-muted/60 px-3 py-2 text-sm">
+        <p className={cn("mt-4 rounded-lg px-3 py-2 text-sm", progress.missing > 0 ? "bg-accent" : "bg-gold/25 font-medium")}>
           {progress.missing > 0 ? (
             <>
               Il vous manque <strong className="num">{progress.missing}</strong> carte{progress.missing > 1 ? "s" : ""}
@@ -152,7 +176,7 @@ export function SetChecklist({
       </section>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div role="group" aria-label="Filtrer les cartes" className="grid grid-cols-3 rounded-lg bg-muted p-1 text-sm">
+        <div role="group" aria-label="Filtrer les cartes" className="grid grid-cols-3 rounded-full border bg-card p-1 text-sm shadow-sm">
           {(
             [
               ["all", `Toutes · ${cards.length}`],
@@ -166,8 +190,8 @@ export function SetChecklist({
               aria-pressed={filter === value}
               onClick={() => setFilter(value)}
               className={cn(
-                "num min-h-9 rounded-md px-2.5 font-medium whitespace-nowrap text-muted-foreground transition-colors",
-                filter === value && "bg-background text-foreground shadow-sm",
+                "num min-h-9 rounded-full px-3 font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground",
+                filter === value && "bg-primary font-semibold text-primary-foreground shadow-sm hover:text-primary-foreground",
               )}
             >
               {label}
@@ -194,7 +218,7 @@ export function SetChecklist({
                   aria-label={`${card.name}, n° ${card.localId}, ${owned ? "possédée" : "manquante"}`}
                   className="relative block w-full rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/60"
                 >
-                  <CardImage src={card.image} alt="" className={cn("transition duration-200", !owned && "opacity-35 grayscale")} />
+                  <CardImage src={card.image} alt="" className={cn("transition duration-200", owned ? "shadow-md" : "opacity-35 grayscale")} />
                   {owned ? (
                     <span className="absolute -top-1.5 -right-1.5 flex size-6 items-center justify-center rounded-full border-2 border-background bg-primary text-primary-foreground">
                       <Check className="size-3.5" strokeWidth={3} />
@@ -218,10 +242,10 @@ export function SetChecklist({
                   aria-label={`Variantes de ${card.name}`}
                   className="flex min-h-11 min-w-0 flex-col justify-center rounded-md px-0.5 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/60"
                 >
-                  <span className="truncate text-xs font-medium">{card.name}</span>
                   <span className="flex items-center justify-between gap-1">
-                    <span className="num text-[11px] text-muted-foreground">
-                      {card.localId}/{official}
+                    <span className="num text-xs font-bold">
+                      {card.localId}
+                      <span className="font-normal text-muted-foreground">/{official}</span>
                     </span>
                     <span className="flex gap-0.5" aria-hidden>
                       {variants.slice(0, 3).map((v) => (
@@ -237,6 +261,7 @@ export function SetChecklist({
                       ))}
                     </span>
                   </span>
+                  <span className="truncate text-xs text-muted-foreground">{card.name}</span>
                 </button>
               </li>
             );

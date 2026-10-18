@@ -19,12 +19,14 @@ export function UserMenu({ username }: { username: string }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        render={<Button variant="ghost" size="icon-lg" className="shrink-0 rounded-full" aria-label={`Compte ${username}`} />}
+        render={
+          <Button variant="ghost" size="icon-lg" className="shrink-0 rounded-full hover:bg-white/15" aria-label={`Compte ${username}`} />
+        }
       >
         {pending ? (
-          <Loader2 className="animate-spin" />
+          <Loader2 className="animate-spin text-primary-foreground" />
         ) : (
-          <span className="flex size-8 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary uppercase ring-1 ring-primary/30">
+          <span className="flex size-8 items-center justify-center rounded-full bg-white text-sm font-bold text-primary uppercase shadow-sm ring-2 ring-white/40">
             {username.slice(0, 1)}
           </span>
         )}

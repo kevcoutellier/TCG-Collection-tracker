@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   description:
     "Cochez vos cartes Pokémon TCG extension par extension, suivez votre avancement et la cote Cardmarket de votre collection.",
   applicationName: "PokéFolio",
-  // Installée sur l'écran d'accueil d'un iPhone : plein écran, barre d'état fondue dans l'en-tête.
+  // Installée sur l'écran d'accueil d'un iPhone : plein écran, barre d'état fondue dans l'en-tête rouge.
   appleWebApp: { capable: true, title: "PokéFolio", statusBarStyle: "black-translucent" },
   icons: { icon: "/favicon.ico", apple: "/apple-touch-icon.png" },
   formatDetection: { telephone: false },
@@ -25,13 +25,13 @@ const GATE_SCRIPT = `try{var d=document.documentElement,s=sessionStorage.getItem
 
 // `viewportFit: "cover"` : la page occupe tout l'écran (encoche, barre d'accueil) ; les marges
 // `env(safe-area-inset-*)` de l'en-tête et de la barre d'onglets gardent le contenu lisible.
-export const viewport: Viewport = { themeColor: "#14161f", colorScheme: "dark", viewportFit: "cover" };
+export const viewport: Viewport = { themeColor: "#d41920", colorScheme: "light", viewportFit: "cover" };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="fr"
-      className={`dark ${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-dvh">
@@ -44,7 +44,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <TooltipProvider>
           {children}
           <Toaster
-            theme="dark"
+            theme="light"
             position="bottom-right"
             richColors
             mobileOffset={{ bottom: "calc(4.5rem + env(safe-area-inset-bottom))" }}
