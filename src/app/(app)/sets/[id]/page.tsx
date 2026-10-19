@@ -1,26 +1,16 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { CardGrid, CardTile } from "@/components/card-tile";
-import { PageHeader, SectionTitle } from "@/components/page-header";
-import { Pagination } from "@/components/pagination";
-import { Stat } from "@/components/stat";
+import { type ChecklistFilter, SetChecklist } from "@/components/checklist/set-checklist";
 import { Skeleton } from "@/components/ui/skeleton";
-import { momentum } from "@/lib/analysis";
-import { getExpansionLabelForCard } from "@/lib/cardmarket";
-import { dateText, eur } from "@/lib/format";
+import { requireUser } from "@/lib/auth/session";
+import { getSetChecklist } from "@/lib/checklist";
+import { loadSetItems } from "@/lib/collection-db";
+import { dateText } from "@/lib/format";
 import { JA_SERIES_LABELS } from "@/lib/japan";
-import { cardVariants, primaryVariant } from "@/lib/pricing";
-import { getSet, getUsdToEur, hydrateCards } from "@/lib/tcgdex";
-import { type Lang, parseLang } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { parseLang } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Extension" };
-
-const PAGE_SIZE = 60;
-const SORTS = { price: "Valeur", number: "Numéro" } as const;
-type Sort = keyof typeof SORTS;
 
 export default function SetPage({ params, searchParams }: PageProps<"/sets/[id]">) {
   return (
@@ -34,127 +24,64 @@ function first(v: string | string[] | undefined) {
   return (Array.isArray(v) ? v[0] : v) ?? "";
 }
 
-function pageHref(id: string, lang: Lang, sort: Sort, page = 1) {
-  const params = new URLSearchParams();
-  if (lang !== "fr") params.set("lang", lang);
-  if (sort !== "price") params.set("sort", sort);
-  if (page > 1) params.set("page", String(page));
-  const qs = params.toString();
-  return `/sets/${encodeURIComponent(id)}${qs ? `?${qs}` : ""}`;
-}
+/** `?vue=manquantes` ou `?vue=possedees` : ouvre la checklist déjà filtrée (lien « cartes manquantes » de l'accueil). */
+const VIEWS: Record<string, ChecklistFilter> = { manquantes: "missing", possedees: "owned" };
 
 async function SetContent({ params, searchParams }: Pick<PageProps<"/sets/[id]">, "params" | "searchParams">) {
   const [{ id: rawId }, sp] = await Promise.all([params, searchParams]);
   const id = decodeURIComponent(rawId);
-  const lang = parseLang(first(sp.lang));
-  const sort: Sort = first(sp.sort) === "number" ? "number" : "price";
-  const page = Math.max(1, Number.parseInt(first(sp.page), 10) || 1);
+  // Catalogue international (servi en français) ou japonais : les ID de cartes diffèrent entre les deux.
+  const lang = parseLang(first(sp.lang)) === "ja" ? "ja" : "fr";
 
-  const set = await getSet(id, lang);
-  if (!set) notFound();
-
-  // Toutes les cartes de l'extension, avec la cote de chacune (cache de quelques heures).
-  const [cards, fx] = await Promise.all([hydrateCards(set.cards.map((c) => c.id), lang), getUsdToEur()]);
-  const priced = cards.map((card) => {
-    const variants = cardVariants(card, fx);
-    const main = primaryVariant(variants);
-    return { card, price: main.price.price, vs30: momentum(main.price).vs30, variants, cardmarketId: main.cardmarketId };
-  });
-  if (sort === "price") priced.sort((a, b) => (b.price ?? -1) - (a.price ?? -1));
-  else priced.sort((a, b) => a.card.localId.localeCompare(b.card.localId, "fr", { numeric: true }));
-
-  const masterValue = priced.reduce((a, c) => a + (c.price ?? 0), 0);
-  const variantCount = priced.reduce((a, c) => a + c.variants.length, 0);
-  const top = [...priced].sort((a, b) => (b.price ?? -1) - (a.price ?? -1))[0];
-  const englishName =
-    lang === "ja" ? await getExpansionLabelForCard(priced.find((p) => p.cardmarketId)?.cardmarketId) : null;
-
-  const pages = Math.max(1, Math.ceil(priced.length / PAGE_SIZE));
-  const current = Math.min(page, pages);
-  const shown = priced.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
-  const secret = Math.max(0, set.cardCount.total - set.cardCount.official);
+  const [checklist, user] = await Promise.all([getSetChecklist(id, lang), requireUser()]);
+  if (!checklist) notFound();
+  const { set, englishName, cards } = checklist;
+  const items = await loadSetItems(user.id, set.id);
+  const official = set.cardCount.official || cards.length;
+  const secret = Math.max(0, cards.length - official);
 
   return (
-    <div className="space-y-8">
-      <PageHeader
-        eyebrow={lang === "ja" ? `Japon · ${JA_SERIES_LABELS[set.serie.id] ?? set.serie.name}` : set.serie.name}
-        title={englishName ? `${englishName}` : set.name}
-        description={
-          <>
-            {englishName && <span className="mr-1 text-foreground">{set.name} ·</span>}
-            Sortie le {dateText(set.releaseDate)} · {set.cardCount.official} cartes officielles
-            {secret ? ` + ${secret} secrètes` : ""}
-          </>
-        }
-        actions={
-          set.logo ? (
-            // eslint-disable-next-line @next/next/no-img-element -- logo distant TCGdex
-            <img src={`${set.logo}.webp`} alt="" className="h-16 max-w-56 object-contain" />
-          ) : undefined
-        }
-      />
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Cartes · variantes" value={`${set.cards.length} · ${variantCount}`} />
-        <Stat label="Valeur du set complet" value={eur(masterValue, { compact: true })} sub="1 exemplaire de chaque carte" accent />
-        <Stat label="Carte la plus chère" value={eur(top?.price)} sub={top?.card.name} />
-        <Stat label="Cartes cotées" value={`${priced.filter((p) => p.price != null).length} / ${set.cards.length}`} />
-      </div>
-
-      <section>
-        <SectionTitle
-          action={
-            <div className="inline-flex rounded-lg border bg-card p-0.5 text-xs">
-              {(Object.keys(SORTS) as Sort[]).map((s) => (
-                <Link
-                  key={s}
-                  href={pageHref(set.id, lang, s)}
-                  className={cn("rounded-md px-2.5 py-1", s === sort ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground")}
-                >
-                  {SORTS[s]}
-                </Link>
-              ))}
-            </div>
-          }
-        >
-          {pages > 1 ? `Cartes ${(current - 1) * PAGE_SIZE + 1}-${Math.min(current * PAGE_SIZE, priced.length)} sur ${priced.length}` : `${priced.length} cartes`}
-        </SectionTitle>
-        <CardGrid>
-          {shown.map(({ card, price, vs30, variants }) => (
-            <CardTile
-              key={card.id}
-              id={card.id}
-              lang={lang}
-              name={card.name}
-              image={card.image}
-              setName={`n° ${card.localId}`}
-              rarity={card.rarity}
-              price={price}
-              vs30={vs30}
-              variantCount={variants.length}
-            />
-          ))}
-        </CardGrid>
-        {pages > 1 && (
-          <div className="mt-4">
-            <Pagination current={current} pages={pages} href={(p) => pageHref(set.id, lang, sort, p)} />
+    <>
+      <header className="flex items-center gap-4 pb-5 sm:gap-6">
+        {set.logo && (
+          <div className="flex h-20 w-28 shrink-0 items-center justify-center rounded-xl border bg-card p-2 shadow-sm sm:h-24 sm:w-44">
+            {/* eslint-disable-next-line @next/next/no-img-element -- logo distant TCGdex */}
+            <img src={`${set.logo}.webp`} alt="" className="max-h-full max-w-full object-contain" />
           </div>
         )}
-      </section>
-    </div>
+        <div className="min-w-0">
+          <div className="text-xs font-semibold tracking-widest text-primary uppercase">
+            {lang === "ja" ? `Japon · ${JA_SERIES_LABELS[set.serie.id] ?? set.serie.name}` : set.serie.name}
+          </div>
+          <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-balance sm:text-3xl">{englishName ?? set.name}</h1>
+          <p className="mt-1 text-sm text-muted-foreground text-pretty">
+            {englishName && <span className="mr-1 text-foreground">{set.name} ·</span>}
+            Sortie le {dateText(set.releaseDate)} · {official} cartes{secret ? ` + ${secret} secrètes` : ""}
+          </p>
+        </div>
+      </header>
+      <SetChecklist
+        setId={set.id}
+        cards={cards}
+        initialItems={items}
+        official={official}
+        lang={lang}
+        initialFilter={VIEWS[first(sp.vue)] ?? "all"}
+      />
+    </>
   );
 }
 
 function SetSkeleton() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <Skeleton className="h-10 w-72" />
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {Array.from({ length: 4 }, (_, i) => (
-          <Skeleton key={i} className="h-24 rounded-xl" />
+      <Skeleton className="h-40 rounded-xl" />
+      <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
+        {Array.from({ length: 12 }, (_, i) => (
+          <Skeleton key={i} className="aspect-[63/88] rounded-lg" />
         ))}
       </div>
-      <Skeleton className="h-96 rounded-xl" />
     </div>
   );
 }

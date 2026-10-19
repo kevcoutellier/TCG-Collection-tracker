@@ -1,6 +1,7 @@
 import {
   date,
   doublePrecision,
+  index,
   integer,
   pgTable,
   primaryKey,
@@ -87,6 +88,49 @@ export const watchlist = pgTable(
   },
   // Une carte n'est surveillée qu'une fois par compte.
   (t) => [uniqueIndex("watchlist_user_card_idx").on(t.userId, t.cardId)],
+);
+
+/**
+ * Collection « checklist » : quantité possédée par carte, langue et variante (voir lib/collection.ts).
+ * Une carte retirée est supprimée : aucune ligne n'a une quantité nulle.
+ */
+export const collectionItems = pgTable(
+  "collection_items",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    cardId: text("card_id").notNull(),
+    cardLang: text("card_lang").$type<Lang>().notNull().default("fr"),
+    /** Variante TCGdex (variantId), ou « normal » / « reverse » pour les lignes reprises du portefeuille. */
+    variant: text("variant").$type<VariantKey>().notNull(),
+    /** Extension de la carte : la complétion par extension se lit sans le catalogue. */
+    setId: text("set_id").notNull(),
+    quantity: integer("quantity").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.cardId, t.cardLang, t.variant] }),
+    index("collection_items_user_set_idx").on(t.userId, t.setId),
+  ],
+);
+
+/**
+ * Amis : une ligne par « `userId` a ajouté `friendId` ». Les collections ne se comparent qu'entre amis
+ * mutuels (les deux lignes existent) : personne ne voit la collection d'un compte sans son accord.
+ */
+export const friendships = pgTable(
+  "friendships",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    friendId: uuid("friend_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.friendId] }), index("friendships_friend_idx").on(t.friendId)],
 );
 
 /** Un relevé de prix par jour et par objet suivi : c'est ce qui construit l'historique. */
@@ -199,4 +243,27 @@ CREATE INDEX IF NOT EXISTS holdings_user_id_idx ON holdings (user_id);
 ALTER TABLE watchlist ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES users(id) ON DELETE CASCADE;
 ALTER TABLE watchlist DROP CONSTRAINT IF EXISTS watchlist_card_id_key;
 CREATE UNIQUE INDEX IF NOT EXISTS watchlist_user_card_idx ON watchlist (user_id, card_id);
+
+-- v4 : collection « checklist », une ligne par carte × langue × variante possédée
+CREATE TABLE IF NOT EXISTS collection_items (
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  card_id text NOT NULL,
+  card_lang text NOT NULL DEFAULT 'fr',
+  variant text NOT NULL,
+  set_id text NOT NULL,
+  quantity integer NOT NULL CHECK (quantity > 0),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, card_id, card_lang, variant)
+);
+CREATE INDEX IF NOT EXISTS collection_items_user_set_idx ON collection_items (user_id, set_id);
+
+-- v5 : amis, pour comparer doubles et cartes manquantes (uniquement entre amis mutuels)
+CREATE TABLE IF NOT EXISTS friendships (
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  friend_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, friend_id),
+  CHECK (user_id <> friend_id)
+);
+CREATE INDEX IF NOT EXISTS friendships_friend_idx ON friendships (friend_id);
 `;

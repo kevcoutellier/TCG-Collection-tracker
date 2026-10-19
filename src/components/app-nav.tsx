@@ -1,32 +1,10 @@
 "use client";
 
-import {
-  BrainCircuit,
-  Eye,
-  Layers,
-  LayoutDashboard,
-  Library,
-  Menu,
-  Search,
-  TrendingUp,
-} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
-import { PokeballIcon } from "@/components/card-image";
-import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { PokeballMark } from "@/components/card-image";
+import { COLLECTION_NAV, INVESTMENT_NAV } from "@/components/nav-items";
 import { cn } from "@/lib/utils";
-
-export const NAV = [
-  { href: "/", label: "Tableau de bord", icon: LayoutDashboard },
-  { href: "/collection", label: "Ma collection", icon: Layers },
-  { href: "/watchlist", label: "Watchlist", icon: Eye },
-  { href: "/analyse", label: "Analyse & stratégie", icon: BrainCircuit },
-  { href: "/marche", label: "Marché", icon: TrendingUp },
-  { href: "/recherche", label: "Recherche", icon: Search },
-  { href: "/sets", label: "Extensions", icon: Library },
-] as const;
 
 function isActive(pathname: string | null, href: string) {
   if (!pathname) return false;
@@ -34,27 +12,32 @@ function isActive(pathname: string | null, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`) || (href === "/recherche" && pathname.startsWith("/cartes"));
 }
 
-export function NavLinks({ onNavigate, pathname = null }: { onNavigate?: () => void; pathname?: string | null }) {
+function NavGroup({ items, pathname }: { items: typeof COLLECTION_NAV | typeof INVESTMENT_NAV; pathname: string | null }) {
+  return items.map(({ href, label, icon: Icon }) => {
+    const active = isActive(pathname, href);
+    return (
+      <Link
+        key={href}
+        href={href}
+        aria-current={active ? "page" : undefined}
+        className={cn(
+          "flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground",
+          active && "bg-sidebar-accent font-semibold text-primary hover:text-primary",
+        )}
+      >
+        <Icon className={cn("size-4", active ? "text-primary" : "text-muted-foreground")} />
+        {label}
+      </Link>
+    );
+  });
+}
+
+export function NavLinks({ pathname = null }: { pathname?: string | null }) {
   return (
     <nav className="grid gap-0.5">
-      {NAV.map(({ href, label, icon: Icon }) => {
-        const active = isActive(pathname, href);
-        return (
-          <Link
-            key={href}
-            href={href}
-            onClick={onNavigate}
-            aria-current={active ? "page" : undefined}
-            className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-foreground/75 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground",
-              active && "bg-sidebar-accent font-medium text-sidebar-foreground",
-            )}
-          >
-            <Icon className={cn("size-4", active && "text-primary")} />
-            {label}
-          </Link>
-        );
-      })}
+      <NavGroup items={COLLECTION_NAV} pathname={pathname} />
+      <div className="mt-5 mb-1 px-3 text-[11px] font-semibold tracking-widest text-muted-foreground uppercase">Investissement</div>
+      <NavGroup items={INVESTMENT_NAV} pathname={pathname} />
     </nav>
   );
 }
@@ -63,32 +46,47 @@ export function ActiveNavLinks() {
   return <NavLinks pathname={usePathname()} />;
 }
 
-export function Brand({ className }: { className?: string }) {
+/** Logo et nom de l'app ; `inverse` : en blanc, pour l'en-tête rouge. */
+export function Brand({ className, inverse = false }: { className?: string; inverse?: boolean }) {
   return (
-    <Link href="/" className={cn("flex items-center gap-2 font-semibold tracking-tight", className)}>
-      <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-        <PokeballIcon className="size-5" />
-      </span>
-      <span className="text-base">
-        Poké<span className="text-primary">Folio</span>
+    <Link href="/" className={cn("flex items-center gap-2 tracking-tight", className)}>
+      <PokeballMark className="size-8 shrink-0 drop-shadow-sm" />
+      <span className={cn("text-lg font-bold", inverse ? "text-primary-foreground" : "text-foreground")}>
+        Poké<span className={inverse ? "font-semibold text-primary-foreground/85" : "text-primary"}>Folio</span>
       </span>
     </Link>
   );
 }
 
-export function MobileNav() {
-  const [open, setOpen] = useState(false);
+/** Barre d'onglets fixée en bas de l'écran sur mobile, au-dessus de la barre d'accueil de l'iPhone. */
+export function MobileTabBar() {
   const pathname = usePathname();
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger render={<Button variant="ghost" size="icon" className="lg:hidden" aria-label="Ouvrir le menu" />}>
-        <Menu />
-      </SheetTrigger>
-      <SheetContent side="left" className="w-72 bg-sidebar p-4">
-        <SheetTitle className="sr-only">Navigation</SheetTitle>
-        <Brand className="mb-4 px-1" />
-        <NavLinks pathname={pathname} onNavigate={() => setOpen(false)} />
-      </SheetContent>
-    </Sheet>
+    <nav
+      aria-label="Navigation principale"
+      className="fixed inset-x-0 bottom-0 z-40 border-t bg-sidebar/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_rgb(0_0_0/5%)] backdrop-blur-md lg:hidden"
+    >
+      <div className="mx-auto grid max-w-lg grid-cols-5 px-1 pt-1.5 pb-1">
+        {COLLECTION_NAV.map(({ href, label, icon: Icon }) => {
+          const active = isActive(pathname, href);
+          return (
+            <Link
+              key={href}
+              href={href}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg text-[11px] font-medium text-muted-foreground transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                active && "font-semibold text-primary",
+              )}
+            >
+              <span className={cn("flex h-7 w-12 items-center justify-center rounded-full transition-colors", active && "bg-accent")}>
+                <Icon className="size-5" />
+              </span>
+              {label}
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
   );
 }

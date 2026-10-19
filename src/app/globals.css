@@ -42,6 +42,7 @@
   --color-gain: var(--gain);
   --color-loss: var(--loss);
   --color-electric: var(--electric);
+  --color-gold: var(--gold);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -51,81 +52,86 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Thème clair (rarement utilisé, l'app force le sombre) */
+/*
+ * Thème clair « Pokédex » (thème de l'app) : fond gris très clair, surfaces blanches, rouge Poké Ball
+ * pour les actions, la progression et les cartes possédées. Le blanc sur le rouge reste lisible (≥ 4,5:1).
+ */
 :root {
-  --background: oklch(0.985 0.004 265);
-  --foreground: oklch(0.2 0.03 265);
+  --background: oklch(0.972 0.004 260);
+  --foreground: oklch(0.22 0.02 260);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2 0.03 265);
+  --card-foreground: oklch(0.22 0.02 260);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2 0.03 265);
-  --primary: oklch(0.8 0.17 88);
-  --primary-foreground: oklch(0.2 0.03 265);
-  --secondary: oklch(0.95 0.01 265);
-  --secondary-foreground: oklch(0.25 0.03 265);
-  --muted: oklch(0.95 0.01 265);
-  --muted-foreground: oklch(0.5 0.03 265);
-  --accent: oklch(0.94 0.015 265);
-  --accent-foreground: oklch(0.25 0.03 265);
-  --destructive: oklch(0.6 0.22 22);
-  --border: oklch(0.9 0.01 265);
-  --input: oklch(0.9 0.01 265);
-  --ring: oklch(0.8 0.17 88);
-  --gain: oklch(0.6 0.16 155);
-  --loss: oklch(0.6 0.21 18);
-  --electric: oklch(0.6 0.18 255);
-  --chart-1: oklch(0.8 0.17 88);
-  --chart-2: oklch(0.6 0.18 255);
-  --chart-3: oklch(0.65 0.16 155);
-  --chart-4: oklch(0.6 0.2 300);
-  --chart-5: oklch(0.65 0.2 20);
-  --radius: 0.75rem;
-  --sidebar: oklch(0.97 0.006 265);
-  --sidebar-foreground: oklch(0.2 0.03 265);
-  --sidebar-primary: oklch(0.8 0.17 88);
-  --sidebar-primary-foreground: oklch(0.2 0.03 265);
-  --sidebar-accent: oklch(0.93 0.015 265);
-  --sidebar-accent-foreground: oklch(0.2 0.03 265);
-  --sidebar-border: oklch(0.9 0.01 265);
-  --sidebar-ring: oklch(0.8 0.17 88);
+  --popover-foreground: oklch(0.22 0.02 260);
+  --primary: oklch(0.555 0.215 27);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.95 0.006 260);
+  --secondary-foreground: oklch(0.25 0.02 260);
+  --muted: oklch(0.948 0.006 260);
+  --muted-foreground: oklch(0.47 0.02 260);
+  --accent: oklch(0.955 0.018 25);
+  --accent-foreground: oklch(0.25 0.02 260);
+  --destructive: oklch(0.52 0.2 27);
+  --border: oklch(0.905 0.007 260);
+  --input: oklch(0.89 0.008 260);
+  --ring: oklch(0.555 0.215 27);
+  --gain: oklch(0.52 0.14 150);
+  --loss: oklch(0.53 0.2 27);
+  --electric: oklch(0.52 0.17 255);
+  --gold: oklch(0.8 0.16 85);
+  --chart-1: oklch(0.555 0.215 27);
+  --chart-2: oklch(0.55 0.17 255);
+  --chart-3: oklch(0.6 0.15 155);
+  --chart-4: oklch(0.55 0.19 300);
+  --chart-5: oklch(0.78 0.16 80);
+  --radius: 0.8rem;
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.22 0.02 260);
+  --sidebar-primary: oklch(0.555 0.215 27);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.955 0.018 25);
+  --sidebar-accent-foreground: oklch(0.22 0.02 260);
+  --sidebar-border: oklch(0.905 0.007 260);
+  --sidebar-ring: oklch(0.555 0.215 27);
 }
 
-/* Thème sombre « terminal de trading » avec le jaune Pokémon en accent */
+/* Variante sombre, mêmes repères (rouge en accent) : non utilisée par défaut. */
 .dark {
-  --background: oklch(0.155 0.018 268);
-  --foreground: oklch(0.96 0.006 265);
-  --card: oklch(0.195 0.022 268);
-  --card-foreground: oklch(0.96 0.006 265);
-  --popover: oklch(0.215 0.024 268);
-  --popover-foreground: oklch(0.96 0.006 265);
-  --primary: oklch(0.86 0.165 90);
-  --primary-foreground: oklch(0.18 0.03 268);
-  --secondary: oklch(0.26 0.026 268);
-  --secondary-foreground: oklch(0.94 0.008 265);
-  --muted: oklch(0.24 0.022 268);
-  --muted-foreground: oklch(0.68 0.025 265);
-  --accent: oklch(0.27 0.03 268);
-  --accent-foreground: oklch(0.96 0.006 265);
-  --destructive: oklch(0.68 0.2 20);
-  --border: oklch(1 0 0 / 8%);
-  --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.86 0.165 90 / 60%);
-  --gain: oklch(0.78 0.17 155);
-  --loss: oklch(0.7 0.2 18);
-  --electric: oklch(0.7 0.16 255);
-  --chart-1: oklch(0.86 0.165 90);
-  --chart-2: oklch(0.7 0.16 255);
-  --chart-3: oklch(0.76 0.15 160);
-  --chart-4: oklch(0.7 0.18 305);
-  --chart-5: oklch(0.72 0.18 25);
-  --sidebar: oklch(0.175 0.02 268);
-  --sidebar-foreground: oklch(0.94 0.008 265);
-  --sidebar-primary: oklch(0.86 0.165 90);
-  --sidebar-primary-foreground: oklch(0.18 0.03 268);
-  --sidebar-accent: oklch(0.25 0.028 268);
-  --sidebar-accent-foreground: oklch(0.96 0.006 265);
-  --sidebar-border: oklch(1 0 0 / 7%);
-  --sidebar-ring: oklch(0.86 0.165 90 / 60%);
+  --background: oklch(0.17 0.012 260);
+  --foreground: oklch(0.96 0.005 260);
+  --card: oklch(0.21 0.014 260);
+  --card-foreground: oklch(0.96 0.005 260);
+  --popover: oklch(0.23 0.015 260);
+  --popover-foreground: oklch(0.96 0.005 260);
+  --primary: oklch(0.62 0.21 27);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.27 0.015 260);
+  --secondary-foreground: oklch(0.94 0.006 260);
+  --muted: oklch(0.25 0.014 260);
+  --muted-foreground: oklch(0.7 0.015 260);
+  --accent: oklch(0.28 0.03 25);
+  --accent-foreground: oklch(0.96 0.005 260);
+  --destructive: oklch(0.66 0.2 25);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 13%);
+  --ring: oklch(0.62 0.21 27 / 70%);
+  --gain: oklch(0.76 0.16 150);
+  --loss: oklch(0.7 0.19 25);
+  --electric: oklch(0.7 0.15 255);
+  --gold: oklch(0.82 0.15 85);
+  --chart-1: oklch(0.66 0.2 27);
+  --chart-2: oklch(0.7 0.15 255);
+  --chart-3: oklch(0.74 0.15 155);
+  --chart-4: oklch(0.7 0.17 300);
+  --chart-5: oklch(0.82 0.15 85);
+  --sidebar: oklch(0.19 0.013 260);
+  --sidebar-foreground: oklch(0.94 0.006 260);
+  --sidebar-primary: oklch(0.62 0.21 27);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.27 0.03 25);
+  --sidebar-accent-foreground: oklch(0.96 0.005 260);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.62 0.21 27 / 70%);
 }
 
 @layer base {
@@ -145,11 +151,9 @@
   .num {
     font-variant-numeric: tabular-nums;
   }
-  /* Halo discret derrière l'en-tête des pages */
+  /* Halo discret sous l'en-tête rouge */
   .glow {
-    background-image:
-      radial-gradient(60rem 18rem at 10% -10%, oklch(0.86 0.165 90 / 9%), transparent 70%),
-      radial-gradient(40rem 16rem at 90% -20%, oklch(0.7 0.16 255 / 10%), transparent 70%);
+    background-image: radial-gradient(70rem 16rem at 50% -8rem, oklch(0.555 0.215 27 / 7%), transparent 70%);
   }
   /* Effet holographique sur les visuels de cartes */
   .holo {
@@ -164,8 +168,8 @@
     background: linear-gradient(
       115deg,
       transparent 30%,
-      oklch(1 0 0 / 14%) 45%,
-      oklch(0.86 0.165 90 / 10%) 52%,
+      oklch(1 0 0 / 22%) 45%,
+      oklch(1 0 0 / 10%) 52%,
       transparent 65%
     );
     background-size: 250% 250%;
