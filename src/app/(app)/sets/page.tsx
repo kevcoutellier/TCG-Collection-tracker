@@ -7,11 +7,11 @@ import { setHref } from "@/components/card-tile";
 import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { requireUser } from "@/lib/auth/session";
+import { getCatalogIndex } from "@/lib/catalog";
+import type { CatalogSetEntry } from "@/lib/catalog-db";
 import { countOfficial } from "@/lib/collection";
 import { type OwnedSet, ownedCardsBySet } from "@/lib/collection-db";
 import { dateText } from "@/lib/format";
-import { getJapaneseSets, type JapaneseSet } from "@/lib/japan";
-import { getSeriesWithSets } from "@/lib/tcgdex";
 import { parseLang } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -63,11 +63,11 @@ async function SetsContent({ searchParams }: Pick<PageProps<"/sets">, "searchPar
 }
 
 /** Avancement d'une extension pour sa vignette : cartes officielles possédées, secrètes à part. */
-function tileProgress(owned: Map<string, OwnedSet>, set: { id: string; cardCount: { official: number; total: number } }) {
+function tileProgress(owned: Map<string, OwnedSet>, set: CatalogSetEntry) {
   const ids = owned.get(set.id)?.cardIds;
   if (!ids?.length) return undefined;
-  const official = set.cardCount.official || set.cardCount.total;
-  return { owned: countOfficial(ids, official, set.cardCount.total), official };
+  const official = set.official || set.total;
+  return { owned: countOfficial(ids, official, set.total), official };
 }
 
 function SetTile({
@@ -83,8 +83,8 @@ function SetTile({
   href: string;
   /** Code de l'extension (« SV03.5 »), affiché comme sur les fiches des cartes. */
   code: string;
-  logo?: string;
-  symbol?: string;
+  logo: string | null;
+  symbol: string | null;
   title: string;
   subtitle?: string | null;
   meta: string;
@@ -145,7 +145,7 @@ function SetTile({
 }
 
 /** En-tête d'une série : repère rouge, logo, nom et date de début. */
-function SerieHeader({ name, logo, since }: { name: string; logo?: string; since?: string | null }) {
+function SerieHeader({ name, logo, since }: { name: string; logo: string | null; since: string | null }) {
   return (
     <div className="mb-4 flex items-center gap-3 border-b pb-2.5">
       <span className="h-8 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden />
@@ -166,7 +166,7 @@ const SERIES_CHIP =
 
 async function SetsList() {
   await connection();
-  const [series, user] = await Promise.all([getSeriesWithSets("fr"), requireUser()]);
+  const [series, user] = await Promise.all([getCatalogIndex("fr"), requireUser()]);
   const owned = await ownedCardsBySet(user.id);
   return (
     <div className="space-y-10">
@@ -189,7 +189,7 @@ async function SetsList() {
                 logo={set.logo}
                 symbol={set.symbol}
                 title={set.name}
-                meta={`${set.cardCount.total} cartes`}
+                meta={`${set.total} cartes`}
                 progress={tileProgress(owned, set)}
               />
             ))}
@@ -202,29 +202,23 @@ async function SetsList() {
 
 async function JapaneseSetsList() {
   await connection();
-  const [sets, user] = await Promise.all([getJapaneseSets(), requireUser()]);
+  const [groups, user] = await Promise.all([getCatalogIndex("ja"), requireUser()]);
   const owned = await ownedCardsBySet(user.id);
-  const groups: { id: string; label: string; sets: JapaneseSet[] }[] = [];
-  for (const s of sets) {
-    let g = groups.find((x) => x.id === s.serieId);
-    if (!g) groups.push((g = { id: s.serieId, label: s.serieLabel, sets: [] }));
-    g.sets.push(s);
-  }
   return (
     <div className="space-y-10">
       <p className="text-sm text-muted-foreground">
-        {sets.length} extensions japonaises · cotes Cardmarket des versions japonaises · nom anglais indiqué quand il existe.
+        {groups.reduce((n, g) => n + g.sets.length, 0)} extensions japonaises · cotes Cardmarket des versions japonaises · nom anglais indiqué quand il existe.
       </p>
       <nav className="flex flex-wrap gap-2" aria-label="Séries japonaises">
         {groups.map((g) => (
           <a key={g.id} href={`#ja-${g.id}`} className={SERIES_CHIP}>
-            {g.label}
+            {g.name}
           </a>
         ))}
       </nav>
       {groups.map((g) => (
         <section key={g.id} id={`ja-${g.id}`} className="scroll-mt-24">
-          <SerieHeader name={g.label} />
+          <SerieHeader name={g.name} logo={null} since={null} />
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
             {g.sets.map((set) => (
               <SetTile
@@ -235,7 +229,7 @@ async function JapaneseSetsList() {
                 symbol={set.symbol}
                 title={set.englishName ?? set.name}
                 subtitle={set.englishName ? set.name : null}
-                meta={`${set.cardCount.total} cartes${set.releaseDate ? ` · ${set.releaseDate.slice(0, 4)}` : ""}`}
+                meta={`${set.total} cartes${set.releaseDate ? ` · ${set.releaseDate.slice(0, 4)}` : ""}`}
                 progress={tileProgress(owned, set)}
               />
             ))}

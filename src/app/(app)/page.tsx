@@ -9,13 +9,13 @@ import { Stat } from "@/components/stat";
 import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { requireUser } from "@/lib/auth/session";
-import { getSetChecklist } from "@/lib/checklist";
+import { getCardSummaries, getSetChecklist } from "@/lib/catalog";
+import { cardKey, catalogLang } from "@/lib/catalog-db";
 import { type CollectionItem, setProgress } from "@/lib/collection";
 import { loadRecentItems } from "@/lib/collection-db";
 import { loadCollectionOverview, type StartedSet } from "@/lib/collection-overview";
 import { eur } from "@/lib/format";
 import { loadTrades } from "@/lib/friends-db";
-import { getCard } from "@/lib/tcgdex";
 
 const int = new Intl.NumberFormat("fr-FR");
 
@@ -42,7 +42,9 @@ async function HomeContent() {
   const inProgress = sets.filter((s) => s.owned < s.official);
   // L'extension la plus avancée parmi celles à moitié faites : celle qu'on a envie de finir.
   const almost = inProgress.filter((s) => s.pct >= 50).sort((a, b) => b.pct - a.pct)[0];
-  const recentCards = await Promise.all(recent.map((i) => getCard(i.cardId, i.lang === "ja" ? "ja" : "fr").catch(() => null)));
+  const recentRefs = recent.map((i) => ({ id: i.cardId, lang: catalogLang(i.lang) }));
+  const summaries = await getCardSummaries(recentRefs);
+  const recentCards = recentRefs.map((ref) => summaries.get(cardKey(ref)) ?? null);
 
   return (
     <div className="space-y-8">
@@ -101,7 +103,7 @@ async function HomeContent() {
             {recentCards.map((card, i) =>
               card ? (
                 <li key={`${recent[i].cardId}:${recent[i].variant}:${recent[i].lang}`} className="min-w-0">
-                  <Link href={cardHref(card.id, recent[i].lang === "ja" ? "ja" : "fr")} className="block space-y-1">
+                  <Link href={cardHref(card.id, recentRefs[i].lang)} className="block space-y-1">
                     <CardImage src={card.image} alt="" />
                     <span className="block truncate text-xs font-medium">{card.name}</span>
                   </Link>

@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { type ChecklistFilter, SetChecklist } from "@/components/checklist/set-checklist";
 import { Skeleton } from "@/components/ui/skeleton";
 import { requireUser } from "@/lib/auth/session";
-import { getSetChecklist } from "@/lib/checklist";
+import { getSetChecklist } from "@/lib/catalog";
 import { loadSetItems } from "@/lib/collection-db";
 import { dateText } from "@/lib/format";
 import { JA_SERIES_LABELS } from "@/lib/japan";

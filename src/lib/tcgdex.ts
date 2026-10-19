@@ -104,6 +104,11 @@ export async function getSet(id: string, lang: Lang = "fr"): Promise<SetDetail |
 export async function getSeriesWithSets(lang: Lang = "fr"): Promise<SerieDetail[]> {
   "use cache";
   cacheLife("days");
+  return fetchSeriesWithSets(lang);
+}
+
+/** Même liste lue en direct, sans cache : c'est elle que recopie lib/catalog.ts. */
+export async function fetchSeriesWithSets(lang: Lang = "fr"): Promise<SerieDetail[]> {
   const list = (await api<{ id: string; name: string }[]>(lang, "/series")) ?? [];
   const details = await mapLimit(
     list.filter((s) => !HIDDEN_SERIES.has(s.id)),

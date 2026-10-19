@@ -1,11 +1,12 @@
-import { cacheLife, cacheTag } from "next/cache";
+import { mapLimit } from "./async";
 import { getExpansionLabelForCard } from "./cardmarket";
 import type { ChecklistCard } from "./collection";
 import { cardVariants, primaryVariant } from "./pricing";
-import { getSet, getUsdToEur, hydrateCards } from "./tcgdex";
-import type { Lang, SetDetail } from "./types";
+import { getCard, getSet, getUsdToEur } from "./tcgdex";
+import type { CardDetail, Lang, SetDetail } from "./types";
 
 // Catalogue d'une extension mis en forme pour la checklist : léger, sérialisable, trié par numéro.
+// Ces fonctions interrogent TCGdex en direct ; les pages passent par lib/catalog.ts, qui garde une copie en base.
 
 export interface ChecklistVariant {
   key: string;
@@ -28,19 +29,23 @@ export interface SetChecklist {
   cards: ChecklistEntry[];
 }
 
-export async function getSetChecklist(id: string, lang: Lang): Promise<SetChecklist | null> {
-  "use cache";
-  cacheLife("hours");
-  cacheTag(`checklist:${lang}:${id}`);
+/**
+ * Extension et cartes lues sur TCGdex. `failedCards` : fiches que TCGdex n'a pas pu renvoyer (erreur passagère,
+ * pas un 404) ; ces cartes restent cochables, sans variantes ni cote, et la copie en base ne doit pas les figer.
+ */
+export async function fetchSetChecklist(id: string, lang: Lang): Promise<{ checklist: SetChecklist; failedCards: number } | null> {
   const set = await getSet(id, lang);
   if (!set) return null;
 
-  const [details, fx] = await Promise.all([hydrateCards(set.cards.map((c) => c.id), lang), getUsdToEur()]);
-  const byId = new Map(details.map((d) => [d.id, d]));
+  // `undefined` : TCGdex en erreur ; `null` : fiche absente de TCGdex (404).
+  const [details, fx] = await Promise.all([
+    mapLimit(set.cards, 16, (c): Promise<CardDetail | null | undefined> => getCard(c.id, lang).catch(() => undefined)),
+    getUsdToEur(),
+  ]);
   let cardmarketId: number | null = null;
-  const cards = set.cards.map((brief): ChecklistEntry => {
-    const card = byId.get(brief.id);
-    // Fiche indisponible (TCGdex en erreur) : la carte reste cochable, sans variantes ni cote.
+  const cards = set.cards.map((brief, i): ChecklistEntry => {
+    const card = details[i];
+    // Fiche indisponible : la carte reste cochable, sans variantes ni cote.
     if (!card) return { id: brief.id, localId: brief.localId, name: brief.name, image: brief.image ?? null, rarity: null, variants: [], price: null };
     const variants = cardVariants(card, fx);
     cardmarketId ??= variants.find((v) => v.cardmarketId)?.cardmarketId ?? null;
@@ -58,7 +63,10 @@ export async function getSetChecklist(id: string, lang: Lang): Promise<SetCheckl
 
   const englishName = lang === "ja" ? await getExpansionLabelForCard(cardmarketId) : null;
   const { name, logo, symbol, cardCount, releaseDate, serie } = set;
-  return { set: { id: set.id, name, logo, symbol, cardCount, releaseDate, serie }, englishName, cards };
+  return {
+    checklist: { set: { id: set.id, name, logo, symbol, cardCount, releaseDate, serie }, englishName, cards },
+    failedCards: details.filter((d) => d === undefined).length,
+  };
 }
 
 export interface SetInfo {
@@ -72,8 +80,8 @@ export interface SetInfo {
   lang: "fr" | "ja";
 }
 
-/** Fiche courte d'une extension à partir de son seul ID : catalogue international d'abord, japonais sinon. */
-export async function getSetInfo(id: string): Promise<SetInfo | null> {
+/** Fiche courte d'une extension lue sur TCGdex : catalogue international d'abord, japonais sinon. */
+export async function fetchSetInfo(id: string): Promise<SetInfo | null> {
   for (const lang of ["fr", "ja"] as const) {
     const set = await getSet(id, lang).catch(() => null);
     if (!set) continue;

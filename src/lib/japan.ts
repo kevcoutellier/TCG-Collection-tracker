@@ -40,6 +40,11 @@ export interface JapaneseSet extends SetSummary {
 export async function getJapaneseSets(): Promise<JapaneseSet[]> {
   "use cache";
   cacheLife("days");
+  return fetchJapaneseSets();
+}
+
+/** Même liste lue en direct, sans cache : c'est elle que recopie lib/catalog.ts. */
+export async function fetchJapaneseSets(): Promise<JapaneseSet[]> {
   const res = await fetch("https://api.tcgdex.net/v2/ja/sets", { headers: { accept: "application/json" } });
   if (!res.ok) throw new Error(`TCGdex a répondu ${res.status} pour les extensions japonaises`);
   const list = (await res.json()) as SetSummary[];
