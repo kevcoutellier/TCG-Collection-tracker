@@ -6,6 +6,7 @@ import type {
   Lang,
   SerieDetail,
   SetDetail,
+  SetSummary,
 } from "./types";
 
 // Client de l'API publique TCGdex : données des cartes + guide des prix Cardmarket/TCGplayer.
@@ -98,6 +99,11 @@ export async function getSet(id: string, lang: Lang = "fr"): Promise<SetDetail |
   "use cache";
   cacheLife("days");
   return api<SetDetail>(lang, `/sets/${encodeURIComponent(id)}`);
+}
+
+/** Toutes les extensions d'une langue, en une requête et sans cache (logos de secours, voir lib/set-logos.ts). */
+export async function fetchSetList(lang: Lang): Promise<SetSummary[]> {
+  return (await api<SetSummary[]>(lang, "/sets")) ?? [];
 }
 
 /** Séries et leurs extensions, de la plus récente à la plus ancienne. */

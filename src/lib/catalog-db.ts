@@ -41,6 +41,22 @@ const CHUNK = 1000;
 
 const indexKey = (lang: CatalogLang) => `catalogIndexedAt:${lang}`;
 
+export interface CatalogIndexInfo {
+  indexedAt: Date;
+  /** Version du calcul de la liste (voir lib/catalog.ts) ; 1 pour une copie antérieure aux versions. */
+  version: number;
+}
+
+function parseIndexInfo(value: string): CatalogIndexInfo {
+  try {
+    const { at, version } = JSON.parse(value) as { at: string; version: number };
+    return { indexedAt: new Date(at), version };
+  } catch {
+    // Copie antérieure aux versions : la valeur est la date seule.
+    return { indexedAt: new Date(value), version: 1 };
+  }
+}
+
 function uniqueById<T extends { id: string }>(items: readonly T[]): T[] {
   const seen = new Set<string>();
   return items.filter((item) => !seen.has(item.id) && (seen.add(item.id), true));
@@ -52,10 +68,11 @@ function chunks<T>(items: readonly T[]): T[][] {
 
 /**
  * Enregistre la liste des extensions d'un catalogue, dans l'ordre d'affichage. Rien n'est supprimé : une série
- * que TCGdex n'a pas renvoyée cette fois (erreur passagère) garde ses extensions. Le nom anglais et la date de
- * sortie déjà connus sont conservés quand la liste ne les donne pas (la liste internationale n'a pas de dates).
+ * que TCGdex n'a pas renvoyée cette fois (erreur passagère) garde ses extensions. Le nom anglais, la date de
+ * sortie, le logo et le symbole déjà connus sont conservés quand la liste ne les donne pas (la liste internationale
+ * n'a pas de dates ; une source de logos peut être indisponible).
  */
-export async function saveCatalogIndex(lang: CatalogLang, series: readonly CatalogSerie[]): Promise<void> {
+export async function saveCatalogIndex(lang: CatalogLang, series: readonly CatalogSerie[], version = 1): Promise<void> {
   const rows = uniqueById(series.flatMap((serie) => serie.sets.map((set) => ({ ...set, serie })))).map(({ serie, ...set }, position) => ({
     ...set,
     lang,
@@ -81,8 +98,8 @@ export async function saveCatalogIndex(lang: CatalogLang, series: readonly Catal
             serieReleaseDate: sql`excluded.serie_release_date`,
             name: sql`excluded.name`,
             englishName: sql`coalesce(excluded.english_name, ${s.englishName})`,
-            logo: sql`excluded.logo`,
-            symbol: sql`excluded.symbol`,
+            logo: sql`coalesce(excluded.logo, ${s.logo})`,
+            symbol: sql`coalesce(excluded.symbol, ${s.symbol})`,
             releaseDate: sql`coalesce(excluded.release_date, ${s.releaseDate})`,
             official: sql`excluded.official`,
             total: sql`excluded.total`,
@@ -93,27 +110,27 @@ export async function saveCatalogIndex(lang: CatalogLang, series: readonly Catal
     }
     await tx
       .insert(schema.appMeta)
-      .values({ key: indexKey(lang), value: new Date().toISOString() })
+      .values({ key: indexKey(lang), value: JSON.stringify({ at: new Date().toISOString(), version }) })
       .onConflictDoUpdate({ target: schema.appMeta.key, set: { value: sql`excluded.value` } });
   });
 }
 
-/** Date de la dernière copie de la liste des extensions ; nulle tant qu'elle n'a jamais été copiée. */
-export async function catalogIndexedAt(lang: CatalogLang): Promise<Date | null> {
+/** Date et version de la dernière copie de la liste des extensions ; nulles tant qu'elle n'a jamais été copiée. */
+export async function catalogIndexInfo(lang: CatalogLang): Promise<CatalogIndexInfo | null> {
   const db = await getDb();
   const [meta] = await db.select({ value: schema.appMeta.value }).from(schema.appMeta).where(eq(schema.appMeta.key, indexKey(lang)));
-  return meta ? new Date(meta.value) : null;
+  return meta ? parseIndexInfo(meta.value) : null;
 }
 
 /** Liste des extensions groupées par série, dans l'ordre d'affichage. */
-export async function loadCatalogIndex(lang: CatalogLang): Promise<{ series: CatalogSerie[]; indexedAt: Date } | null> {
+export async function loadCatalogIndex(lang: CatalogLang): Promise<({ series: CatalogSerie[] } & CatalogIndexInfo) | null> {
   const db = await getDb();
-  const [indexedAt, rows] = await Promise.all([
-    catalogIndexedAt(lang),
+  const [info, rows] = await Promise.all([
+    catalogIndexInfo(lang),
     db.select().from(s).where(eq(s.lang, lang)).orderBy(asc(s.position), asc(s.id)),
   ]);
   // Sans liste copiée, seules les extensions ouvertes par lien direct sont connues : liste incomplète.
-  if (!indexedAt) return null;
+  if (!info) return null;
   const series: CatalogSerie[] = [];
   const byId = new Map<string, CatalogSerie>();
   for (const r of rows) {
@@ -126,7 +143,7 @@ export async function loadCatalogIndex(lang: CatalogLang): Promise<{ series: Cat
     const { id, name, englishName, logo, symbol, releaseDate, official, total } = r;
     serie.sets.push({ id, name, englishName, logo, symbol, releaseDate, official, total });
   }
-  return { series, indexedAt };
+  return { series, ...info };
 }
 
 /** Remplace les cartes d'une extension par leur dernière lecture sur TCGdex. */
@@ -156,8 +173,9 @@ export async function saveSetCatalog(lang: CatalogLang, { set, englishName, card
         set: {
           name: sql`excluded.name`,
           englishName: sql`coalesce(excluded.english_name, ${s.englishName})`,
-          logo: sql`excluded.logo`,
-          symbol: sql`excluded.symbol`,
+          // Un logo de secours trouvé par la liste reste tant que TCGdex n'en donne pas.
+          logo: sql`coalesce(excluded.logo, ${s.logo})`,
+          symbol: sql`coalesce(excluded.symbol, ${s.symbol})`,
           releaseDate: sql`coalesce(excluded.release_date, ${s.releaseDate})`,
           official: sql`excluded.official`,
           total: sql`excluded.total`,
