@@ -8,17 +8,15 @@ import { AddFriendForm, FriendButton } from "@/components/forms/friend-forms";
 import { EmptyState, PageHeader, SectionTitle } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { requireUser } from "@/lib/auth/session";
+import { getCardSummaries } from "@/lib/catalog";
+import { type CardSummary, cardKey, catalogLang } from "@/lib/catalog-db";
 import type { TradeCard } from "@/lib/collection";
 import { type FriendTrades, loadTrades } from "@/lib/friends-db";
-import { getCard } from "@/lib/tcgdex";
-import type { CardDetail, Lang } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Échanges" };
 
 /** Cartes affichées par liste ; au-delà, on indique le nombre restant. */
 const SHOWN = 12;
-
-const catalogLang = (lang: Lang) => (lang === "ja" ? "ja" : "fr");
 
 export default function TradesPage() {
   return (
@@ -38,10 +36,8 @@ async function TradesContent() {
   const user = await requireUser();
   const { friends, trades } = await loadTrades(user.id);
 
-  const shown = new Map<string, TradeCard>();
-  for (const t of trades) for (const c of [...t.forMe.slice(0, SHOWN), ...t.forThem.slice(0, SHOWN)]) shown.set(c.cardId, c);
-  const details = await Promise.all([...shown.values()].map((c) => getCard(c.cardId, catalogLang(c.lang)).catch(() => null)));
-  const cards = new Map(details.filter((c): c is CardDetail => c !== null).map((c) => [c.id, c]));
+  const shown = trades.flatMap((t) => [...t.forMe.slice(0, SHOWN), ...t.forThem.slice(0, SHOWN)]);
+  const cards = await getCardSummaries(shown.map((c) => ({ id: c.cardId, lang: catalogLang(c.lang) })));
   const nobody = !friends.mutual.length && !friends.incoming.length && !friends.outgoing.length;
 
   return (
@@ -120,7 +116,7 @@ function Avatar({ name }: { name: string }) {
   );
 }
 
-function FriendTradesCard({ trades, cards }: { trades: FriendTrades; cards: Map<string, CardDetail> }) {
+function FriendTradesCard({ trades, cards }: { trades: FriendTrades; cards: Map<string, CardSummary> }) {
   const { friend, forMe, forThem } = trades;
   return (
     <section className="space-y-5 rounded-xl border bg-card p-4 sm:p-5">
@@ -142,7 +138,7 @@ function FriendTradesCard({ trades, cards }: { trades: FriendTrades; cards: Map<
   );
 }
 
-function TradeList({ title, items, cards }: { title: string; items: TradeCard[]; cards: Map<string, CardDetail> }) {
+function TradeList({ title, items, cards }: { title: string; items: TradeCard[]; cards: Map<string, CardSummary> }) {
   return (
     <div>
       <h3 className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{title}</h3>
@@ -150,7 +146,7 @@ function TradeList({ title, items, cards }: { title: string; items: TradeCard[];
         <>
           <ul className="grid grid-cols-4 gap-2.5 sm:grid-cols-6 lg:grid-cols-8">
             {items.slice(0, SHOWN).map((item) => {
-              const card = cards.get(item.cardId);
+              const card = cards.get(cardKey({ id: item.cardId, lang: catalogLang(item.lang) }));
               return (
                 <li key={item.cardId} className="min-w-0">
                   <Link href={cardHref(item.cardId, catalogLang(item.lang))} className="block space-y-1">

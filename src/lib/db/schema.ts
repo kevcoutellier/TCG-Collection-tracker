@@ -3,6 +3,7 @@ import {
   doublePrecision,
   index,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   text,
@@ -11,6 +12,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import type { HoldingKind } from "../analysis";
+import type { ChecklistVariant } from "../checklist";
 import type { Lang, VariantKey } from "../types";
 
 /** Comptes : chacun a sa propre collection et sa propre watchlist. */
@@ -131,6 +133,56 @@ export const friendships = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.userId, t.friendId] }), index("friendships_friend_idx").on(t.friendId)],
+);
+
+/**
+ * Catalogue TCGdex recopié en base (voir lib/catalog.ts) : les pages le lisent en une requête au lieu
+ * d'interroger TCGdex carte par carte, et l'app reste utilisable si TCGdex ne répond plus.
+ * `lang` : « fr » pour le catalogue international, « ja » pour le japonais (les ID diffèrent).
+ * La série est dénormalisée sur chaque extension ; `position` donne l'ordre de la liste des extensions.
+ */
+export const catalogSets = pgTable(
+  "catalog_sets",
+  {
+    lang: text("lang").$type<"fr" | "ja">().notNull(),
+    id: text("id").notNull(),
+    serieId: text("serie_id").notNull(),
+    serieName: text("serie_name").notNull(),
+    serieLogo: text("serie_logo"),
+    serieReleaseDate: text("serie_release_date"),
+    name: text("name").notNull(),
+    /** Nom anglais d'une extension japonaise (via Cardmarket). */
+    englishName: text("english_name"),
+    logo: text("logo"),
+    symbol: text("symbol"),
+    releaseDate: text("release_date"),
+    official: integer("official").notNull(),
+    total: integer("total").notNull(),
+    position: integer("position").notNull(),
+    indexedAt: timestamp("indexed_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Dernière copie des cartes ; nul tant que l'extension n'a jamais été ouverte ni synchronisée. */
+    cardsSyncedAt: timestamp("cards_synced_at", { withTimezone: true }),
+  },
+  (t) => [primaryKey({ columns: [t.lang, t.id] })],
+);
+
+export const catalogCards = pgTable(
+  "catalog_cards",
+  {
+    lang: text("lang").$type<"fr" | "ja">().notNull(),
+    id: text("id").notNull(),
+    setId: text("set_id").notNull(),
+    /** Rang dans l'extension, trié par numéro. */
+    position: integer("position").notNull(),
+    localId: text("local_id").notNull(),
+    name: text("name").notNull(),
+    image: text("image"),
+    rarity: text("rarity"),
+    /** Cote de la variante de référence (EUR). */
+    price: doublePrecision("price"),
+    variants: jsonb("variants").$type<ChecklistVariant[]>().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.lang, t.id] }), index("catalog_cards_set_idx").on(t.lang, t.setId)],
 );
 
 /** Un relevé de prix par jour et par objet suivi : c'est ce qui construit l'historique. */
@@ -266,4 +318,40 @@ CREATE TABLE IF NOT EXISTS friendships (
   CHECK (user_id <> friend_id)
 );
 CREATE INDEX IF NOT EXISTS friendships_friend_idx ON friendships (friend_id);
+
+-- v6 : catalogue TCGdex recopié en base (extensions et cartes)
+CREATE TABLE IF NOT EXISTS catalog_sets (
+  lang text NOT NULL,
+  id text NOT NULL,
+  serie_id text NOT NULL,
+  serie_name text NOT NULL,
+  serie_logo text,
+  serie_release_date text,
+  name text NOT NULL,
+  english_name text,
+  logo text,
+  symbol text,
+  release_date text,
+  official integer NOT NULL,
+  total integer NOT NULL,
+  position integer NOT NULL,
+  indexed_at timestamptz NOT NULL DEFAULT now(),
+  cards_synced_at timestamptz,
+  PRIMARY KEY (lang, id)
+);
+
+CREATE TABLE IF NOT EXISTS catalog_cards (
+  lang text NOT NULL,
+  id text NOT NULL,
+  set_id text NOT NULL,
+  position integer NOT NULL,
+  local_id text NOT NULL,
+  name text NOT NULL,
+  image text,
+  rarity text,
+  price double precision,
+  variants jsonb NOT NULL,
+  PRIMARY KEY (lang, id)
+);
+CREATE INDEX IF NOT EXISTS catalog_cards_set_idx ON catalog_cards (lang, set_id);
 `;

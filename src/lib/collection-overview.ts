@@ -1,5 +1,5 @@
-import { mapLimit } from "./async";
-import { getSetInfo, type SetInfo } from "./checklist";
+import { getSetInfos } from "./catalog";
+import type { SetInfo } from "./checklist";
 import { type CollectionItem, type CollectionTotals, collectionTotals, countOfficial } from "./collection";
 import { loadCollectionItems, ownedCardsBySet } from "./collection-db";
 
@@ -22,10 +22,9 @@ export interface CollectionOverview {
 
 export async function loadCollectionOverview(userId: string): Promise<CollectionOverview> {
   const [items, owned] = await Promise.all([loadCollectionItems(userId), ownedCardsBySet(userId)]);
-  const entries = [...owned];
-  const infos = await mapLimit(entries, 6, ([setId]) => getSetInfo(setId));
-  const sets = entries.flatMap(([, set], i): StartedSet[] => {
-    const info = infos[i];
+  const infos = await getSetInfos([...owned.keys()]);
+  const sets = [...owned].flatMap(([setId, set]): StartedSet[] => {
+    const info = infos.get(setId);
     // Extension inconnue du catalogue (ID repris d'une ancienne saisie) : comptée dans les totaux seulement.
     if (!info) return [];
     const n = countOfficial(set.cardIds, info.official, info.total);
