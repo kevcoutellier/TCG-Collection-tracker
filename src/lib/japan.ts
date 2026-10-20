@@ -1,7 +1,7 @@
 import { cacheLife } from "next/cache";
 import { mapLimit } from "./async";
 import { getExpansionLabel, getSinglesExpansionMap } from "./cardmarket";
-import { getCard, getSet } from "./tcgdex";
+import { fetchSetList, getCard, getSet } from "./tcgdex";
 import type { SetSummary } from "./types";
 
 // Extensions japonaises (TCGdex « ja »). Leurs noms sont en japonais : on retrouve le nom anglais
@@ -45,12 +45,11 @@ export async function getJapaneseSets(): Promise<JapaneseSet[]> {
 
 /** Même liste lue en direct, sans cache : c'est elle que recopie lib/catalog.ts. */
 export async function fetchJapaneseSets(): Promise<JapaneseSet[]> {
-  const res = await fetch("https://api.tcgdex.net/v2/ja/sets", { headers: { accept: "application/json" } });
-  if (!res.ok) throw new Error(`TCGdex a répondu ${res.status} pour les extensions japonaises`);
-  const list = (await res.json()) as SetSummary[];
+  const list = await fetchSetList("ja");
   const singles = await getSinglesExpansionMap().catch(() => new Map<number, number>());
 
-  const sets = await mapLimit(list, 12, async (s): Promise<JapaneseSet | null> => {
+  // Six extensions à la fois (jusqu'à 4 requêtes TCGdex chacune) : TCGdex répond 503 quand on le presse trop.
+  const sets = await mapLimit(list, 6, async (s): Promise<JapaneseSet | null> => {
     const set = await getSet(s.id, "ja").catch(() => null);
     if (!set) return null;
     let idExpansion: number | null = null;

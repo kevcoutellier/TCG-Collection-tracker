@@ -66,9 +66,9 @@ function refreshLater(label: string, run: () => Promise<unknown>) {
  * Lit une extension sur TCGdex et la copie en base. La copie est faite seulement si toutes les fiches ont été lues :
  * une erreur passagère ne fige pas des cartes sans variantes ni cote. `saved` : la copie a bien été enregistrée.
  */
-export function syncSet(id: string, lang: CatalogLang): Promise<{ checklist: SetChecklist; saved: boolean } | null> {
+export function syncSet(id: string, lang: CatalogLang, concurrency?: number): Promise<{ checklist: SetChecklist; saved: boolean } | null> {
   return once(`set:${lang}:${id}`, async () => {
-    const live = await fetchSetChecklist(id, lang);
+    const live = await fetchSetChecklist(id, lang, concurrency);
     if (!live) return null;
     let saved = false;
     if (live.failedCards === 0) {
@@ -225,13 +225,13 @@ export async function refreshCatalog({ budgetMs }: { budgetMs: number }): Promis
   const due = await setsDueForRefresh(new Date(Date.now() - CARDS_TTL + HOUR));
   const result = { index, synced: 0, incomplete: 0, failed: 0 };
   let next = 0;
-  // Trois extensions à la fois (16 fiches chacune) : rapide sans surcharger TCGdex.
+  // Deux extensions à la fois, 8 fiches chacune : à 48 requêtes simultanées, TCGdex répondait 503 en rafale.
   await Promise.all(
-    Array.from({ length: 3 }, async () => {
+    Array.from({ length: 2 }, async () => {
       while (next < due.length && Date.now() < deadline) {
         const { lang, id } = due[next++];
         try {
-          const res = await syncSet(id, lang);
+          const res = await syncSet(id, lang, 8);
           if (!res) result.failed++;
           else if (res.saved) result.synced++;
           else result.incomplete++;

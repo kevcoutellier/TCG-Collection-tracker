@@ -16,13 +16,34 @@ const POCKET_SERIE = "tcgp";
 /** Séries exclues de la navigation : TCG Pocket et kits d'entraînement. */
 const HIDDEN_SERIES = new Set([POCKET_SERIE, "tk"]);
 
+/** Réponses passagères (TCGdex surchargé ou redémarrant) : la requête est retentée. */
+const RETRY_STATUS = new Set([429, 500, 502, 503, 504]);
+/** Attente avant chaque nouvelle tentative (ms) ; `Retry-After` l'emporte, dans la limite de MAX_RETRY_WAIT. */
+const RETRY_DELAYS = [500, 2000];
+const MAX_RETRY_WAIT = 5000;
+/** Une requête sans réponse au bout de ce délai est abandonnée (puis retentée). */
+const REQUEST_TIMEOUT = 15_000;
+
+function retryWait(res: Response | null, attempt: number): number {
+  const after = Number(res?.headers.get("retry-after"));
+  return Number.isFinite(after) && after > 0 ? Math.min(after * 1000, MAX_RETRY_WAIT) : RETRY_DELAYS[attempt];
+}
+
 async function api<T>(lang: Lang, path: string): Promise<T | null> {
-  const res = await fetch(`${API}/${lang}${path}`, {
-    headers: { accept: "application/json" },
-  });
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`TCGdex a répondu ${res.status} pour ${path}`);
-  return (await res.json()) as T;
+  for (let attempt = 0; ; attempt++) {
+    const last = attempt >= RETRY_DELAYS.length;
+    // Le signal sert aussi à sortir de la mémorisation des `fetch` de Next : sans lui, dans un rendu ou une fonction
+    // "use cache", la nouvelle tentative recevrait la même réponse en erreur sans rien redemander.
+    const init = { headers: { accept: "application/json" }, signal: AbortSignal.timeout(REQUEST_TIMEOUT) };
+    const res = await fetch(`${API}/${lang}${path}`, init).catch((err: unknown) => {
+      if (last) throw err;
+      return null;
+    });
+    if (res?.status === 404) return null;
+    if (res?.ok) return (await res.json()) as T;
+    if (res && (last || !RETRY_STATUS.has(res.status))) throw new Error(`TCGdex a répondu ${res.status} pour ${path}`);
+    await new Promise((resolve) => setTimeout(resolve, retryWait(res, attempt)));
+  }
 }
 
 /** URL d'image TCGdex ; les visuels sont servis en `<base>/<qualité>.webp`. */
