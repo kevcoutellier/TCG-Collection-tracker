@@ -6,6 +6,7 @@ import { z } from "zod";
 import { conditionValues, languageValues, sealedValues } from "@/lib/constants";
 import { priceKey } from "@/lib/analysis";
 import { requireUser } from "@/lib/auth/session";
+import { collectHeldCard } from "@/lib/collection-db";
 import { getDb, schema } from "@/lib/db";
 import { todayISO } from "@/lib/format";
 import { recordCardSnapshot, recordKeySnapshot, recordManualSnapshot, refreshTrackedPrices } from "@/lib/snapshots";
@@ -137,8 +138,10 @@ export async function addCardHolding(_: ActionState, formData: FormData): Promis
     } else if (data.gradingCompany && data.grade) {
       await snapshotQuote({ id: row.id, kind: "card", ...data, productId: null, manualPrice: null });
     }
+    // Achetée, donc possédée : la carte est aussi cochée dans la collection (checklist de son extension).
+    await collectHeldCard(user.id, { cardId: data.cardId, lang: data.cardLang, variant: data.variant });
     refresh();
-    return { ok: true, message: `« ${data.name} » ajoutée à votre collection` };
+    return { ok: true, message: `« ${data.name} » ajoutée à votre portefeuille` };
   } catch (e) {
     return fail(e);
   }
@@ -174,7 +177,7 @@ export async function addSealedHolding(_: ActionState, formData: FormData): Prom
       });
     }
     refresh();
-    return { ok: true, message: `« ${data.name} » ajouté à votre collection` };
+    return { ok: true, message: `« ${data.name} » ajouté à votre portefeuille` };
   } catch (e) {
     return fail(e);
   }

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { setCardQuantity } from "@/app/collection-actions";
 import { CardImage } from "@/components/card-image";
 import { cardHref } from "@/components/card-tile";
+import { AddHoldingDialog } from "@/components/forms/holding-forms";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import type { ChecklistEntry, ChecklistVariant } from "@/lib/checklist";
@@ -16,6 +17,14 @@ import type { Lang } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export type ChecklistFilter = "all" | "owned" | "missing";
+
+/** De quoi ajouter une carte au portefeuille depuis la checklist (prix d'achat, date…). */
+export interface ChecklistPortfolio {
+  /** Nom de l'extension enregistré avec l'achat. */
+  setName: string;
+  ageYears: number | null;
+  today: string;
+}
 
 const FALLBACK_VARIANT: ChecklistVariant = { key: "normal", type: "normal", label: "Normale", price: null };
 
@@ -71,6 +80,7 @@ export function SetChecklist({
   official,
   lang,
   initialFilter = "all",
+  portfolio,
 }: {
   setId: string;
   cards: ChecklistEntry[];
@@ -79,6 +89,7 @@ export function SetChecklist({
   /** Langue enregistrée pour les cartes cochées depuis ce catalogue. */
   lang: Lang;
   initialFilter?: ChecklistFilter;
+  portfolio?: ChecklistPortfolio;
 }) {
   const [rows, setRows] = useState(initialItems);
   const [filter, setFilter] = useState<ChecklistFilter>(initialFilter);
@@ -198,7 +209,9 @@ export function SetChecklist({
             </button>
           ))}
         </div>
-        <p className="text-xs text-muted-foreground">Touchez une carte pour la cocher, son nom pour les variantes.</p>
+        <p className="text-xs text-muted-foreground">
+          Touchez une carte pour la cocher, son nom pour les variantes{portfolio ? " ou l'ajouter au portefeuille" : ""}.
+        </p>
       </div>
 
       {visible.length ? (
@@ -309,7 +322,19 @@ export function SetChecklist({
                   );
                 })}
               </ul>
-              <div className="px-4">
+              <div className="space-y-1 px-4">
+                {portfolio && (
+                  <AddHoldingDialog
+                    key={open.id}
+                    card={{ cardId: open.id, cardLang: lang, name: open.name, setName: portfolio.setName, image: open.image, rarity: open.rarity }}
+                    variants={(open.variants.length ? open.variants : [FALLBACK_VARIANT]).map((v) => ({ key: v.key, label: v.label, price: v.price, sales: null }))}
+                    ageYears={portfolio.ageYears}
+                    today={portfolio.today}
+                    size="lg"
+                    triggerVariant="outline"
+                    triggerClassName="w-full"
+                  />
+                )}
                 <Link href={cardHref(open.id, lang)} className={buttonVariants({ variant: "ghost", className: "w-full" })}>
                   Fiche complète et historique des prix
                 </Link>

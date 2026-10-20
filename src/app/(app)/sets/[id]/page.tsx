@@ -4,10 +4,11 @@ import { Suspense } from "react";
 import { type ChecklistFilter, SetChecklist } from "@/components/checklist/set-checklist";
 import { SetLogo } from "@/components/set-logo";
 import { Skeleton } from "@/components/ui/skeleton";
+import { setAgeYears } from "@/lib/analysis";
 import { requireUser } from "@/lib/auth/session";
 import { getSetChecklist } from "@/lib/catalog";
 import { loadSetItems } from "@/lib/collection-db";
-import { dateText } from "@/lib/format";
+import { dateText, todayISO } from "@/lib/format";
 import { JA_SERIES_LABELS } from "@/lib/japan";
 import { parseLang } from "@/lib/types";
 
@@ -75,6 +76,11 @@ async function SetContent({ params, searchParams }: Pick<PageProps<"/sets/[id]">
         official={official}
         lang={lang}
         initialFilter={VIEWS[first(sp.vue)] ?? "all"}
+        portfolio={{
+          setName: englishName ? `${set.name} (${englishName})` : set.name,
+          ageYears: setAgeYears(set.releaseDate, new Date()),
+          today: todayISO(),
+        }}
       />
     </>
   );

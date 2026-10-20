@@ -1,4 +1,4 @@
-import { Download, Layers, Plus, Search } from "lucide-react";
+import { Download, Layers, Library, Search } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { after } from "next/server";
@@ -33,8 +33,12 @@ async function CollectionContent() {
 
   const actions = (
     <>
-      <Link href="/recherche" className={buttonVariants()}>
-        <Plus />
+      <Link href="/sets" className={buttonVariants()}>
+        <Library />
+        Par extension
+      </Link>
+      <Link href="/recherche" className={buttonVariants({ variant: "outline" })}>
+        <Search />
         Carte
       </Link>
       <AddSealedDialog today={today} />
@@ -52,10 +56,14 @@ async function CollectionContent() {
         <PageHeader title="Portefeuille" description="Vos cartes, cartes gradées et produits scellés, valorisés au prix du marché." />
         <EmptyState
           icon={<Layers />}
-          title="Votre collection est vide"
-          description="Recherchez une carte pour l'ajouter avec son prix d'achat, ou enregistrez un produit scellé (display, ETB…)."
+          title="Votre portefeuille est vide"
+          description="Ouvrez une extension et touchez le nom d'une carte pour l'ajouter avec son prix d'achat, recherchez une carte, ou enregistrez un produit scellé (display, ETB…)."
         >
-          <Link href="/recherche" className={buttonVariants()}>
+          <Link href="/sets" className={buttonVariants()}>
+            <Library />
+            Parcourir les extensions
+          </Link>
+          <Link href="/recherche" className={buttonVariants({ variant: "outline" })}>
             <Search />
             Rechercher une carte
           </Link>
