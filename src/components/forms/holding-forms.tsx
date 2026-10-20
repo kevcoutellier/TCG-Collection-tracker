@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ExternalLink, Loader2, PackagePlus, Pencil, Plus, Search, Tag, Trash2 } from "lucide-react";
+import { ArrowLeft, ExternalLink, Loader2, PackagePlus, Pencil, Search, Tag, Trash2, Wallet } from "lucide-react";
 import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
@@ -74,21 +74,29 @@ export interface CardRef {
   rarity?: string | null;
 }
 
+/** Achat d'une carte pour le portefeuille (prix, date, état, gradation) ; la carte est aussi cochée dans la collection. */
 export function AddHoldingDialog({
   card,
   variants,
   ageYears,
   today,
   size = "default",
+  triggerVariant = "default",
+  triggerClassName,
+  initialVariant,
 }: {
   card: CardRef;
   variants: GradedVariantOption[];
   ageYears: number | null;
   today: string;
   size?: "default" | "sm" | "lg";
+  triggerVariant?: "default" | "outline" | "secondary";
+  triggerClassName?: string;
+  /** Variante présélectionnée (sinon la première). */
+  initialVariant?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [variantKey, setVariantKey] = useState(variants[0]?.key ?? "normal");
+  const [variantKey, setVariantKey] = useState(initialVariant ?? variants[0]?.key ?? "normal");
   const variant = variants.find((v) => v.key === variantKey) ?? variants[0];
   const [graded, setGraded] = useState(false);
   const [price, setPrice] = useState(variant?.price?.toFixed(2) ?? "");
@@ -102,14 +110,16 @@ export function AddHoldingDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen} disablePointerDismissal>
-      <DialogTrigger render={<Button size={size} />}>
-        <Plus />
-        Ajouter à ma collection
+      <DialogTrigger render={<Button size={size} variant={triggerVariant} className={triggerClassName} />}>
+        <Wallet />
+        Ajouter au portefeuille
       </DialogTrigger>
       <DialogContent className={FORM_DIALOG}>
         <DialogHeader>
-          <DialogTitle>Ajouter « {card.name} »</DialogTitle>
-          <DialogDescription>{card.setName}</DialogDescription>
+          <DialogTitle>Ajouter « {card.name} » au portefeuille</DialogTitle>
+          <DialogDescription>
+            {card.setName ? `${card.setName} · ` : ""}la carte est aussi cochée dans votre collection.
+          </DialogDescription>
         </DialogHeader>
         <form action={formAction} className="grid gap-4">
           <Hidden

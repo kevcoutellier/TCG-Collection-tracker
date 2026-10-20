@@ -1,5 +1,6 @@
 import { and, desc, eq, max, sql } from "drizzle-orm";
 import type { CollectionItem } from "./collection";
+import type { Lang, VariantKey } from "./types";
 import { getDb, schema } from "./db";
 
 // Accès en base à la collection « checklist ». Chaque fonction reçoit l'ID du compte : l'appelant
@@ -100,6 +101,31 @@ export async function loadRecentItems(userId: string, limit: number): Promise<Co
   await importHoldingsOnce(userId);
   const db = await getDb();
   return db.select(itemColumns).from(t).where(eq(t.userId, userId)).orderBy(desc(t.updatedAt)).limit(limit);
+}
+
+/** Extension d'une carte d'après son ID TCGdex (« sv03.5-006 » → « sv03.5 »), comme pour la reprise du portefeuille. */
+function setIdOf(cardId: string): string {
+  const i = cardId.lastIndexOf("-");
+  return i > 0 ? cardId.slice(0, i) : cardId;
+}
+
+/**
+ * Une carte achetée (portefeuille) est possédée : sa ligne de collection compte au moins les exemplaires encore
+ * détenus au portefeuille dans cette langue et cette variante. Une carte déjà cochée n'est pas comptée deux fois.
+ */
+export async function collectHeldCard(userId: string, card: { cardId: string; lang: Lang; variant: VariantKey }): Promise<void> {
+  await importHoldingsOnce(userId);
+  const db = await getDb();
+  await db.execute(sql`
+    INSERT INTO collection_items (user_id, card_id, card_lang, variant, set_id, quantity)
+    SELECT ${userId}, ${card.cardId}, ${card.lang}, ${card.variant}, ${setIdOf(card.cardId)}, sum(h.quantity)::int
+    FROM holdings h
+    WHERE h.user_id = ${userId} AND h.kind = 'card' AND h.card_id = ${card.cardId} AND h.card_lang = ${card.lang}
+      AND h.variant = ${card.variant} AND h.sold_at IS NULL
+    HAVING sum(h.quantity) > 0
+    ON CONFLICT (user_id, card_id, card_lang, variant)
+    DO UPDATE SET quantity = greatest(collection_items.quantity, excluded.quantity), updated_at = now()
+  `);
 }
 
 /** Fixe la quantité possédée d'une carte × langue × variante ; à 0, la ligne est supprimée. */
