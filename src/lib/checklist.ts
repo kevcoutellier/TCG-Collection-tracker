@@ -32,14 +32,19 @@ export interface SetChecklist {
 /**
  * Extension et cartes lues sur TCGdex. `failedCards` : fiches que TCGdex n'a pas pu renvoyer (erreur passagère,
  * pas un 404) ; ces cartes restent cochables, sans variantes ni cote, et la copie en base ne doit pas les figer.
+ * `concurrency` : fiches demandées en même temps (moins pour le cron, qui n'est pas pressé).
  */
-export async function fetchSetChecklist(id: string, lang: Lang): Promise<{ checklist: SetChecklist; failedCards: number } | null> {
+export async function fetchSetChecklist(
+  id: string,
+  lang: Lang,
+  concurrency = 16,
+): Promise<{ checklist: SetChecklist; failedCards: number } | null> {
   const set = await getSet(id, lang);
   if (!set) return null;
 
   // `undefined` : TCGdex en erreur ; `null` : fiche absente de TCGdex (404).
   const [details, fx] = await Promise.all([
-    mapLimit(set.cards, 16, (c): Promise<CardDetail | null | undefined> => getCard(c.id, lang).catch(() => undefined)),
+    mapLimit(set.cards, concurrency, (c): Promise<CardDetail | null | undefined> => getCard(c.id, lang).catch(() => undefined)),
     getUsdToEur(),
   ]);
   let cardmarketId: number | null = null;

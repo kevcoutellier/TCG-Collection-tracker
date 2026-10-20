@@ -9,6 +9,8 @@ const t = schema.collectionItems;
 
 /** Comptes dont le portefeuille a déjà été repris dans ce processus (évite une écriture par requête). */
 const imported = new Set<string>();
+/** Reprises en cours : les lectures lancées en parallèle (accueil) attendent la même. */
+const importing = new Map<string, Promise<void>>();
 
 /**
  * Reprend une seule fois par compte les cartes du portefeuille encore détenues (une ligne par carte,
@@ -17,6 +19,15 @@ const imported = new Set<string>();
  */
 export async function importHoldingsOnce(userId: string): Promise<void> {
   if (imported.has(userId)) return;
+  let pending = importing.get(userId);
+  if (!pending) {
+    pending = importHoldings(userId).finally(() => importing.delete(userId));
+    importing.set(userId, pending);
+  }
+  return pending;
+}
+
+async function importHoldings(userId: string): Promise<void> {
   const db = await getDb();
   await db.execute(sql`
     WITH claim AS (
