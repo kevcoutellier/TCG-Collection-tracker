@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { type ChecklistFilter, SetChecklist } from "@/components/checklist/set-checklist";
+import { SetLogo } from "@/components/set-logo";
 import { Skeleton } from "@/components/ui/skeleton";
 import { requireUser } from "@/lib/auth/session";
 import { getSetChecklist } from "@/lib/catalog";
@@ -43,10 +44,17 @@ async function SetContent({ params, searchParams }: Pick<PageProps<"/sets/[id]">
   return (
     <>
       <header className="flex items-center gap-4 pb-5 sm:gap-6">
-        {set.logo && (
+        {(set.logo || set.symbol) && (
           <div className="flex h-20 w-28 shrink-0 items-center justify-center rounded-xl border bg-card p-2 shadow-sm sm:h-24 sm:w-44">
-            {/* eslint-disable-next-line @next/next/no-img-element -- logo distant TCGdex */}
-            <img src={`${set.logo}.webp`} alt="" className="max-h-full max-w-full object-contain" />
+            <SetLogo
+              sources={[
+                { src: set.logo, className: "max-h-full max-w-full object-contain" },
+                { src: set.symbol, className: "size-12 object-contain" },
+              ]}
+              fallback={
+                <span className="text-sm font-bold tracking-wide text-muted-foreground">{lang === "ja" ? set.id : set.id.toUpperCase()}</span>
+              }
+            />
           </div>
         )}
         <div className="min-w-0">

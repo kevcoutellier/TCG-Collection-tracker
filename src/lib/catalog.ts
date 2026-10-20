@@ -7,7 +7,8 @@ import {
   type CatalogLang,
   type CatalogSerie,
   cardKey,
-  catalogIndexedAt,
+  type CatalogIndexInfo,
+  catalogIndexInfo,
   findCatalogCards,
   findCatalogSets,
   loadCatalogIndex,
@@ -18,6 +19,7 @@ import {
 } from "./catalog-db";
 import { fetchSetChecklist, fetchSetInfo, type SetChecklist, type SetInfo } from "./checklist";
 import { fetchJapaneseSets, type JapaneseSet } from "./japan";
+import { completeSetImages } from "./set-logos";
 import { fetchSeriesWithSets, getCard } from "./tcgdex";
 import type { SerieDetail } from "./types";
 
@@ -31,6 +33,13 @@ const DAY = 24 * HOUR;
 const CARDS_TTL = 3 * DAY;
 /** Durée de vie de la liste des extensions : la japonaise est longue à reconstruire (noms anglais). */
 const INDEX_TTL: Record<CatalogLang, number> = { fr: DAY, ja: 7 * DAY };
+/** Version du calcul de la liste : une copie d'une version antérieure est refaite sans attendre (2 : logos de secours). */
+const INDEX_VERSION = 2;
+
+/** Liste copiée assez récemment, par la version actuelle ; `margin` l'avance (passage du cron). */
+function isIndexFresh(info: CatalogIndexInfo, lang: CatalogLang, margin = 0) {
+  return info.version === INDEX_VERSION && Date.now() - info.indexedAt.getTime() < INDEX_TTL[lang] - margin;
+}
 
 /** Lectures TCGdex en cours dans ce processus : deux visites simultanées ne copient qu'une fois. */
 const inflight = new Map<string, Promise<unknown>>();
@@ -81,7 +90,10 @@ export async function getSetChecklist(id: string, lang: CatalogLang): Promise<Se
     if (Date.now() - stored.syncedAt.getTime() > CARDS_TTL) refreshLater(`${lang}/${id}`, () => syncSet(id, lang));
     return stored.checklist;
   }
-  return (await syncSet(id, lang))?.checklist ?? null;
+  const live = await syncSet(id, lang);
+  if (!live?.saved) return live?.checklist ?? null;
+  // Relue en base : elle garde le logo de secours trouvé par la liste quand TCGdex n'en donne pas en français.
+  return (await loadSetCatalog(lang, id).catch(() => null))?.checklist ?? live.checklist;
 }
 
 function internationalIndex(series: SerieDetail[]): CatalogSerie[] {
@@ -123,12 +135,25 @@ function japaneseIndex(sets: JapaneseSet[]): CatalogSerie[] {
   return [...series.values()];
 }
 
+/** Logos et symboles de secours des extensions qui n'en ont pas chez TCGdex (voir lib/set-logos.ts). */
+async function withSetImages(lang: CatalogLang, series: CatalogSerie[]): Promise<CatalogSerie[]> {
+  const sets = new Map((await completeSetImages(lang, series.flatMap((s) => s.sets))).map((s) => [s.id, s]));
+  return series.map((serie) => {
+    const list = serie.sets.map((s) => sets.get(s.id) ?? s);
+    // Comme TCGdex : une série sans logo prend celui d'une de ses extensions.
+    return { ...serie, logo: serie.logo ?? list.find((s) => s.logo)?.logo ?? null, sets: list };
+  });
+}
+
 /** Relit la liste des extensions sur TCGdex et la copie en base. */
 function syncIndex(lang: CatalogLang): Promise<CatalogSerie[]> {
   return once(`index:${lang}`, async () => {
-    const series = lang === "fr" ? internationalIndex(await fetchSeriesWithSets("fr")) : japaneseIndex(await fetchJapaneseSets());
+    const series = await withSetImages(
+      lang,
+      lang === "fr" ? internationalIndex(await fetchSeriesWithSets("fr")) : japaneseIndex(await fetchJapaneseSets()),
+    );
     // Liste vide : TCGdex en panne plutôt qu'un catalogue vidé ; la copie précédente est gardée.
-    if (series.length) await saveCatalogIndex(lang, series).catch((err) => console.error(`Copie de la liste ${lang} impossible`, err));
+    if (series.length) await saveCatalogIndex(lang, series, INDEX_VERSION).catch((err) => console.error(`Copie de la liste ${lang} impossible`, err));
     return series;
   });
 }
@@ -138,7 +163,7 @@ export async function getCatalogIndex(lang: CatalogLang): Promise<CatalogSerie[]
   await io();
   const stored = await loadCatalogIndex(lang).catch((err) => (console.error("Lecture du catalogue impossible", err), null));
   if (stored) {
-    if (Date.now() - stored.indexedAt.getTime() > INDEX_TTL[lang]) refreshLater(`liste ${lang}`, () => syncIndex(lang));
+    if (!isIndexFresh(stored, lang)) refreshLater(`liste ${lang}`, () => syncIndex(lang));
     return stored.series;
   }
   return syncIndex(lang);
@@ -187,9 +212,9 @@ export async function refreshCatalog({ budgetMs }: { budgetMs: number }): Promis
   const deadline = Date.now() + budgetMs;
   const index: CatalogRefresh["index"] = {};
   for (const lang of ["fr", "ja"] as const) {
-    const indexedAt = await catalogIndexedAt(lang);
+    const info = await catalogIndexInfo(lang);
     // Une heure de marge : le cron quotidien ne doit pas tomber quelques secondes avant l'échéance.
-    if (indexedAt && Date.now() - indexedAt.getTime() < INDEX_TTL[lang] - HOUR) continue;
+    if (info && isIndexFresh(info, lang, HOUR)) continue;
     try {
       index[lang] = (await syncIndex(lang)).reduce((n, serie) => n + serie.sets.length, 0);
     } catch (err) {

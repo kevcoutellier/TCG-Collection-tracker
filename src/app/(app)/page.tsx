@@ -5,6 +5,7 @@ import { CardImage } from "@/components/card-image";
 import { cardHref, setHref } from "@/components/card-tile";
 import { InstallHint } from "@/components/install-hint";
 import { PageHeader, SectionTitle } from "@/components/page-header";
+import { SetLogo } from "@/components/set-logo";
 import { Stat } from "@/components/stat";
 import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -121,12 +122,13 @@ function SetRow({ set }: { set: StartedSet }) {
   return (
     <Link href={checklistHref(set)} className="flex items-center gap-3 rounded-xl border bg-card p-3 transition-colors hover:border-primary/40 hover:bg-accent/40">
       <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-muted">
-        {set.symbol || set.logo ? (
-          // eslint-disable-next-line @next/next/no-img-element -- symbole distant TCGdex
-          <img src={`${set.symbol ?? set.logo}.webp`} alt="" className="max-h-7 max-w-8 object-contain" loading="lazy" />
-        ) : (
-          <Library className="size-5 text-muted-foreground" />
-        )}
+        <SetLogo
+          sources={[
+            { src: set.symbol, className: "max-h-7 max-w-8 object-contain" },
+            { src: set.logo, className: "max-h-7 max-w-8 object-contain" },
+          ]}
+          fallback={<Library className="size-5 text-muted-foreground" />}
+        />
       </span>
       <span className="min-w-0 flex-1 space-y-1.5">
         <span className="flex items-baseline justify-between gap-2">

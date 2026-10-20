@@ -7,7 +7,7 @@ import {
   type CatalogSerie,
   type CatalogSetEntry,
   cardKey,
-  catalogIndexedAt,
+  catalogIndexInfo,
   findCatalogCards,
   findCatalogSets,
   loadCatalogIndex,
@@ -67,7 +67,7 @@ describe("catalogue en base", () => {
   it("n'a pas de liste tant qu'elle n'a pas été copiée, même si une extension l'a été", async () => {
     await saveSetCatalog("fr", checklist("direct", [card("direct", "001")]));
     expect(await loadCatalogIndex("fr")).toBeNull();
-    expect(await catalogIndexedAt("fr")).toBeNull();
+    expect(await catalogIndexInfo("fr")).toBeNull();
   });
 
   it("restitue la liste dans l'ordre, groupée par série", async () => {
@@ -83,6 +83,15 @@ describe("catalogue en base", () => {
       ["swsh", ["swsh12", "swsh11"]],
     ]);
     expect(stored?.series[0]).toMatchObject({ name: "Série sv", logo: "https://assets.tcgdex.net/fr/sv/logo", releaseDate: "2023-03-31" });
+  });
+
+  it("note la version du calcul de la liste, 1 pour une copie antérieure aux versions", async () => {
+    const db = await getDb();
+    const at = "2026-10-01T04:00:00.000Z";
+    await db.update(schema.appMeta).set({ value: at }).where(eq(schema.appMeta.key, "catalogIndexedAt:fr"));
+    expect(await catalogIndexInfo("fr")).toEqual({ indexedAt: new Date(at), version: 1 });
+    await saveCatalogIndex("fr", [serie("sv", [entry("sv03.5"), entry("sv03"), entry("sv02")]), serie("swsh", [entry("swsh12"), entry("swsh11")])], 2);
+    expect((await loadCatalogIndex("fr"))?.version).toBe(2);
   });
 
   it("garde le nom anglais, la date de sortie et les extensions absentes d'une nouvelle liste", async () => {
@@ -115,6 +124,18 @@ describe("catalogue en base", () => {
     const first = (await loadCatalogIndex("fr"))!.series[0].sets[0];
     expect(first.id).toBe("sv03.5");
     expect(first.releaseDate).toBe("2023-09-22");
+  });
+
+  it("garde un logo de secours que ni la liste suivante ni la fiche de l'extension ne donnent", async () => {
+    const logo = "https://images.pokemontcg.io/base1/logo.png";
+    await saveCatalogIndex("fr", [serie("base", [entry("base1", { logo, symbol: "https://assets.tcgdex.net/univ/base/base1/symbol" })])]);
+    // Source de logos indisponible à la copie suivante, puis fiche TCGdex sans logo en français.
+    await saveCatalogIndex("fr", [serie("base", [entry("base1")])]);
+    await saveSetCatalog("fr", checklist("base1", [card("base1", "1")], { logo: undefined, symbol: undefined }));
+    expect((await loadSetCatalog("fr", "base1"))?.checklist.set).toMatchObject({ logo, symbol: "https://assets.tcgdex.net/univ/base/base1/symbol" });
+    const tcgdexLogo = "https://assets.tcgdex.net/fr/base/base1/logo";
+    await saveSetCatalog("fr", checklist("base1", [card("base1", "1")], { logo: tcgdexLogo }));
+    expect((await loadSetCatalog("fr", "base1"))?.checklist.set.logo).toBe(tcgdexLogo);
   });
 
   it("ignore une extension listée dont les cartes n'ont jamais été copiées", async () => {

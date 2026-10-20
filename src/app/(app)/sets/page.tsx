@@ -5,6 +5,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { setHref } from "@/components/card-tile";
 import { PageHeader } from "@/components/page-header";
+import { SetLogo } from "@/components/set-logo";
 import { Skeleton } from "@/components/ui/skeleton";
 import { requireUser } from "@/lib/auth/session";
 import { getCatalogIndex } from "@/lib/catalog";
@@ -98,15 +99,13 @@ function SetTile({
       className="group relative flex flex-col overflow-hidden rounded-xl border bg-card shadow-sm transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
     >
       <div className="flex h-20 items-center justify-center border-b bg-muted/50 px-3">
-        {logo ? (
-          // eslint-disable-next-line @next/next/no-img-element -- logo distant TCGdex
-          <img src={`${logo}.webp`} alt="" className="max-h-14 max-w-full object-contain transition group-hover:scale-105" loading="lazy" />
-        ) : symbol ? (
-          // eslint-disable-next-line @next/next/no-img-element -- symbole distant TCGdex
-          <img src={`${symbol}.webp`} alt="" className="size-9 object-contain" loading="lazy" />
-        ) : (
-          <span className="text-sm font-bold tracking-wide text-muted-foreground">{code}</span>
-        )}
+        <SetLogo
+          sources={[
+            { src: logo, className: "max-h-14 max-w-full object-contain transition group-hover:scale-105" },
+            { src: symbol, className: "size-9 object-contain" },
+          ]}
+          fallback={<span className="text-sm font-bold tracking-wide text-muted-foreground">{code}</span>}
+        />
       </div>
       {complete && (
         <span className="absolute top-2 right-2 flex items-center gap-1 rounded-full bg-gold px-2 py-0.5 text-[10px] font-bold text-foreground shadow-sm">
@@ -116,10 +115,7 @@ function SetTile({
       )}
       <div className="flex flex-1 flex-col gap-1.5 p-3">
         <div className="flex items-center gap-1.5">
-          {symbol && logo && (
-            // eslint-disable-next-line @next/next/no-img-element -- symbole distant TCGdex
-            <img src={`${symbol}.webp`} alt="" className="size-4 object-contain" loading="lazy" />
-          )}
+          {logo && <SetLogo sources={[{ src: symbol, className: "size-4 object-contain" }]} />}
           <span className="num rounded bg-secondary px-1.5 py-px text-[10px] font-bold tracking-wide text-muted-foreground">{code}</span>
         </div>
         <div className="line-clamp-2 text-sm leading-snug font-semibold">{title}</div>
@@ -149,10 +145,7 @@ function SerieHeader({ name, logo, since }: { name: string; logo: string | null;
   return (
     <div className="mb-4 flex items-center gap-3 border-b pb-2.5">
       <span className="h-8 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden />
-      {logo && (
-        // eslint-disable-next-line @next/next/no-img-element -- logo distant TCGdex
-        <img src={`${logo}.webp`} alt="" className="h-8 max-w-20 shrink-0 object-contain" loading="lazy" />
-      )}
+      <SetLogo sources={[{ src: logo, className: "h-8 max-w-20 shrink-0 object-contain" }]} />
       <div className="min-w-0">
         <h2 className="text-lg leading-tight font-bold text-balance">{name}</h2>
         {since && <p className="text-xs text-muted-foreground">depuis {dateText(since)}</p>}
